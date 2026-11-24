@@ -3,12 +3,12 @@
 An overhead map of where you are, zoomable, with the real-time rain on it, drawn as
 letters in a terminal. Built on [vtscreen](https://github.com/briefnotion/vtscreen).
 
-**Status:** just started. It reads its settings, has the View that turns places on the earth
-into places on the screen (zoom, pan, cell shape, ready for a rotated map), has a polite web
-fetcher, a PNG reader, a way of turning radar colours into rain strengths and a worker thread
-that fetches pictures in the background (none of them used by the screen yet), and shows a graticule with a marker as a stand-in for the
-map. Planned, in this order: one radar frame at a fixed place, zoom and pan keys,
-a base map, an animated loop of the last hour or two, alerts.
+**Status:** it works end to end, in a first form. It reads its settings, asks NOAA's radar service
+for a picture of the area on screen (in the background, so the screen never waits), turns the
+colours into rain strengths and draws the rain as letters on top of a graticule and a marker that
+stand in for the map. It follows the window being resized, and fetches again every few minutes
+and when the view moves off the picture. Not yet: keys for zoom and pan, a base map (coastlines
+and so on), the animated loop of the last hour or two, alerts.
 
 ## Build and run
 
@@ -53,6 +53,9 @@ rules it follows are in `src/request_policy.cpp`:
   4 minutes and so on up to 30 minutes, and longer if the server sends `Retry-After`; a success
   starts over, and while it waits nothing goes out at all;
 - never more than 120 requests an hour, as a safety net against a bug that loops;
+- the program itself asks for a picture only at start, then every `refresh_minutes` (never under 5),
+  and when the view has moved off the picture and stayed there for a second; never twice within 5
+  seconds, and after a failure it waits at least 10 seconds, or as long as the service asked;
 - only https, a 10 second connect and 30 second total time limit, an 8 MB size limit, and a
   request can be cancelled at once when the program quits.
 
@@ -63,6 +66,14 @@ The radar comes as PNG pictures, and there is no PNG reader in C++, so this proj
 ones, checks everything (the signature, every chunk's checksum, sizes, the compressed data's
 checksum) and refuses anything odd with a reason, since the pictures come off the network. A
 1500 x 1000 picture takes about 40 milliseconds.
+
+## Seeing the rain
+
+The program draws the area in `settings.json` (the sample is Wichita, Kansas). To look at weather
+elsewhere, change `location` and `zoom_km` there. Stronger rain is brighter (so it also reads with
+`--no-color`) and shimmers faster; in colour it follows the weather scale: pale blue, green, yellow,
+orange, red, magenta. The line at the top left says how the radar is doing: asking, fetched, or why
+an update failed and when it will try again.
 
 ## The worker thread
 

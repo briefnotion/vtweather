@@ -1,4 +1,4 @@
-// Tests for the View, the settings loader and the request policy. Plain asserts, no framework:
+// Tests for the View, the settings loader, the request policy and the radar scheduler. Plain asserts, no framework:
 // the program prints what failed and exits with the number of failures.
 #include <cmath>
 #include <cstdio>
@@ -8,6 +8,7 @@
 
 #include "check.h"
 
+#include "../src/radar_scheduler.h"
 #include "../src/request_policy.h"
 #include "../src/settings.h"
 #include "../src/view.h"
@@ -289,12 +290,79 @@ void policy_tests() {
     }
 }
 
+// When to ask for a new radar picture, with a made-up clock (seconds)
+void scheduler_tests() {
+    using vtw::RadarScheduler;
+    // the first picture is asked for at once, and not again until it is time
+    {
+        RadarScheduler s(300);
+        CHECK(s.due(0, false, false));
+        s.requested(0);
+        s.finished(1, true, 0);
+        CHECK(!s.due(2, true, true));                              // covered, not yet time
+        CHECK(!s.due(299, true, true));
+        CHECK(s.due(300, true, true));                             // the refresh time
+        s.requested(300);
+        CHECK(!s.due(301, true, true));
+    }
+    // moving somewhere the picture does not cover: only after staying there a moment
+    {
+        RadarScheduler s(300);
+        s.requested(0);
+        s.finished(1, true, 0);
+        CHECK(!s.due(50, true, false));                            // just moved: starts the wait
+        CHECK(!s.due(50.5, true, false));
+        CHECK(s.due(51.1, true, false));                           // stayed a second: ask
+        s.requested(51.1);
+        CHECK(!s.due(52, true, false));                            // never twice within the spacing
+        CHECK(!s.due(56, true, false));                            // still within the spacing
+        CHECK(!s.due(57.2, true, false));                          // spacing over: the moment's wait starts again
+        CHECK(s.due(58.3, true, false));
+    }
+    // moving about (never staying) asks for nothing; coming back resets the wait
+    {
+        RadarScheduler s(300);
+        s.requested(0);
+        s.finished(1, true, 0);
+        for (double t = 10; t < 30; t += 0.4) {
+            const bool covered = ((int)(t * 10) / 4) % 2 == 0;     // in and out every 0.4 s
+            CHECK(!s.due(t, true, covered));
+        }
+        CHECK(!s.due(40, true, false));
+        CHECK(!s.due(40.9, true, false));
+        CHECK(!s.due(40.95, true, true));                          // back in view: the wait is forgotten
+        CHECK(!s.due(41.5, true, false));
+    }
+    // after a failure: wait at least 10 s, or as long as the service asked, then try again
+    {
+        RadarScheduler s(300);
+        CHECK(s.due(0, false, false));
+        s.requested(0);
+        s.finished(2, false, 0);
+        CHECK(!s.due(5, false, false));
+        CHECK(!s.due(11.9, false, false));
+        CHECK(s.due(12.1, false, false));
+        s.requested(12.1);
+        s.finished(14, false, 120);                                // the service says: not for 2 minutes
+        CHECK(!s.due(100, false, false));
+        CHECK(s.due(134.5, false, false));
+        // with a picture in hand a failed refresh is also tried again after the wait
+        s.requested(134.5);
+        s.finished(135, true, 0);
+        s.requested(500);
+        s.finished(501, false, 0);
+        CHECK(!s.due(505, true, true));
+        CHECK(s.due(511.5, true, true));
+    }
+}
+
 }  // namespace
 
 int main() {
     view_tests();
     settings_tests();
     policy_tests();
+    scheduler_tests();
     if (failures == 0) std::printf("all tests passed\n");
     else std::printf("%d check(s) failed\n", failures);
     return failures;

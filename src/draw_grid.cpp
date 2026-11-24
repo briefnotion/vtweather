@@ -2,7 +2,6 @@
 
 #include <cmath>
 #include <cstdio>
-#include <vector>
 
 namespace vtw {
 
@@ -35,13 +34,8 @@ bool line_between(double low, double high, double step) {
 
 }  // namespace
 
-void draw_graticule(const View& view, vtscreen::Picture& picture) {
-    const int cols = view.cols(), rows = view.rows();
-
-    // the earth under every cell corner
-    std::vector<GeoPoint> corner((size_t)(cols + 1) * (rows + 1));
-    for (int r = 0; r <= rows; r++)
-        for (int c = 0; c <= cols; c++) corner[(size_t)r * (cols + 1) + c] = view.at(c, r);
+void draw_graticule(const View& view, const CellGrid& grid, vtscreen::Picture& picture) {
+    const int cols = grid.cols(), rows = grid.rows();
 
     const double lon_per_col = std::fabs(view.at(cols / 2.0 + 1, rows / 2.0).lon -
                                          view.at(cols / 2.0, rows / 2.0).lon);
@@ -50,28 +44,21 @@ void draw_graticule(const View& view, vtscreen::Picture& picture) {
 
     for (int r = 0; r < rows; r++) {
         for (int c = 0; c < cols; c++) {
-            const GeoPoint& a = corner[(size_t)r * (cols + 1) + c];
-            const GeoPoint& b = corner[(size_t)r * (cols + 1) + c + 1];
-            const GeoPoint& d = corner[(size_t)(r + 1) * (cols + 1) + c];
-            const GeoPoint& e = corner[(size_t)(r + 1) * (cols + 1) + c + 1];
-            const double lat_low = std::min({a.lat, b.lat, d.lat, e.lat});
-            const double lat_high = std::max({a.lat, b.lat, d.lat, e.lat});
-            const double lon_low = std::min({a.lon, b.lon, d.lon, e.lon});
-            const double lon_high = std::max({a.lon, b.lon, d.lon, e.lon});
-            const bool lat_line = line_between(lat_low, lat_high, step);
-            const bool lon_line = line_between(lon_low, lon_high, step);
+            const GeoBox cell = grid.box(c, r);
+            const bool lat_line = line_between(cell.south, cell.north, step);
+            const bool lon_line = line_between(cell.west, cell.east, step);
             if (!lat_line && !lon_line) continue;
 
-            vtscreen::PicCell& cell = picture.at(r, c);
-            cell.lum = lat_line && lon_line ? CROSSING_BRIGHTNESS : LINE_BRIGHTNESS;
-            cell.r = 90; cell.g = 135; cell.b = 175;
+            vtscreen::PicCell& pic = picture.at(r, c);
+            pic.lum = lat_line && lon_line ? CROSSING_BRIGHTNESS : LINE_BRIGHTNESS;
+            pic.r = 90; pic.g = 135; pic.b = 175;
 
             // labels: latitudes down the left edge, longitudes along the bottom
             if (lat_line && c == 0)
-                picture.text(r, 0, degrees_text(std::floor(lat_high / step) * step, 'N', 'S', decimals),
+                picture.text(r, 0, degrees_text(std::floor(cell.north / step) * step, 'N', 'S', decimals),
                              110, 160, 205);
             if (lon_line && r == rows - 1)
-                picture.text(r, c + 1, degrees_text(std::floor(lon_high / step) * step, 'E', 'W', decimals),
+                picture.text(r, c + 1, degrees_text(std::floor(cell.east / step) * step, 'E', 'W', decimals),
                              110, 160, 205);
         }
     }
@@ -85,7 +72,7 @@ void draw_marker(const View& view, GeoPoint place, vtscreen::Picture& picture) {
 }
 
 void draw_readout(const View& view, const Settings& settings, const std::string& notes,
-                  vtscreen::Picture& picture) {
+                  const std::string& radar_status, vtscreen::Picture& picture) {
     char line[160];
     int row = 0;
     picture.text(row++, 1, settings.place_name);
@@ -97,6 +84,7 @@ void draw_readout(const View& view, const Settings& settings, const std::string&
                   view.km_per_col());
     picture.text(row++, 1, line);
     picture.text(row++, 1, "settings: " + settings.source);
+    picture.text(row++, 1, radar_status, 150, 200, 150);
 
     size_t start = 0;
     while (start < notes.size()) {                           // one amber line per note

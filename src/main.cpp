@@ -1,9 +1,10 @@
 // vtweather - an overhead map of where you are, with the real-time rain on it, drawn as
 // letters in a terminal by vtscreen.
 //
-// Right now there is no map yet: a graticule (lines of latitude and longitude) and a
-// marker stand in for it, to show that the View places things correctly. The loop is
-// the one from the design: setup, then gather, output, show and wait, again and again.
+// There is no base map yet: a graticule (lines of latitude and longitude) and a marker stand
+// in for it. On top of it goes the rain, from NOAA's radar. The loop is the one from the design:
+// setup, then gather, output, show and wait, again and again. The radar picture is fetched on
+// a thread of its own (RadarFeed), so nothing here ever waits for the network.
 //
 //   ./build/vtweather [--settings FILE] [--no-color] [--fps N] [--cols N --rows N]
 
@@ -11,6 +12,8 @@
 #include <string>
 
 #include "draw_grid.h"
+#include "draw_radar.h"
+#include "radar_feed.h"
 #include "settings.h"
 #include "view.h"
 #include "vtscreen/vtscreen.h"
@@ -37,6 +40,8 @@ int main(int argc, char** argv) {
     view.set_zoom_km(settings.zoom_km);
     view.set_size(cols, rows - 1);                 // the last row is the status bar
 
+    vtw::RadarFeed radar(settings);          // asks for the first picture on the first frame
+
     vtscreen::Display display;
     display.open(options, cols, rows);
     display.start();
@@ -52,11 +57,16 @@ int main(int argc, char** argv) {
             view.set_size(cols, rows - 1);
         }
 
+        // gather: a new radar picture, if one has arrived, and a request if it is time
+        radar.update(view, t);
+
         // output
         picture.init(rows - 1, cols);
-        vtw::draw_graticule(view, picture);
+        const vtw::CellGrid grid(view);
+        vtw::draw_graticule(view, grid, picture);
+        vtw::draw_radar(grid, radar.frame(), picture);
         vtw::draw_marker(view, settings.home, picture);
-        vtw::draw_readout(view, settings, notes, picture);
+        vtw::draw_readout(view, settings, notes, radar.status(t), picture);
         display.bar(picture, info, t, true);
 
         // show, then wait for the next frame
