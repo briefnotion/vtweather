@@ -1,1 +1,7 @@
-{"location": {"name": "Seattle", "lat": 47.6, "lon": -122.3}, "zoom_km": 150, "cell_aspect": 2.0, "refresh_minutes": 5, "user_agent_contact": ""}
+{
+    "location": { "name": "Wichita, Kansas (sample)", "lat": 37.69, "lon": -97.34 },
+    "zoom_km": 80,
+    "cell_aspect": 2.0,
+    "refresh_minutes": 5,
+    "user_agent_contact": ""
+}
