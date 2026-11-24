@@ -11,6 +11,8 @@ constexpr double RIVER_BRIGHTNESS = 0.15;
 constexpr double STATE_BRIGHTNESS = 0.20;
 constexpr double COUNTRY_BRIGHTNESS = 0.26;
 constexpr double COAST_BRIGHTNESS = 0.33;
+constexpr double ROAD_BRIGHTNESS = 0.16;
+constexpr double HIGHWAY_BRIGHTNESS = 0.23;
 
 void set_ground(vtscreen::PicCell& cell, double brightness, int r, int g, int b, int back_r, int back_g, int back_b) {
     cell.lum = brightness;
@@ -35,6 +37,10 @@ void draw_ground(const GroundMap& ground, vtscreen::Picture& picture) {
                 set_ground(cell, STATE_BRIGHTNESS, 150, 120, 175, 12, 24, 12);
             } else if (kind == Ground::Coast) {
                 set_ground(cell, COAST_BRIGHTNESS, 190, 170, 120, 12, 24, 12);
+            } else if (features & FEATURE_HIGHWAY) {
+                set_ground(cell, HIGHWAY_BRIGHTNESS, 230, 180, 85, 12, 24, 12);
+            } else if (features & FEATURE_ROAD) {
+                set_ground(cell, ROAD_BRIGHTNESS, 165, 135, 80, 12, 24, 12);
             } else if (features & FEATURE_RIVER) {
                 set_ground(cell, RIVER_BRIGHTNESS, 70, 140, 205, 12, 24, 12);
             } else {

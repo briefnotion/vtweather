@@ -1,8 +1,8 @@
 // GroundMap: which cells of the screen are land, water or coast, worked out from the BaseMap.
 // The polygons are projected through the View and filled into the grid of cells (a scan line
 // across every row, even-odd rule, so holes work); lakes are then cut out of the land, and a land
-// cell with water next to it becomes coast. Rivers and borders, which are lines, are traced through
-// the cells they cross. It is worked out again only when the view changes,
+// cell with water next to it becomes coast. Rivers, borders and roads, which are lines, are traced
+// through the cells they cross. It is worked out again only when the view changes,
 // not every frame.
 //
 // The level of detail follows the zoom: the coarse world map for views of thousands of
@@ -23,8 +23,13 @@ constexpr double MEDIUM_DETAIL_BELOW_KM = 1500;
 constexpr double FINE_DETAIL_BELOW_KM = 200;
 
 // What runs through a cell besides land and water: a river, a state or province border, a country
-// border (any mix of them, as bits).
-constexpr uint8_t FEATURE_RIVER = 1, FEATURE_STATE = 2, FEATURE_COUNTRY = 4;
+// border, a major highway, another highway (any mix of them, as bits).
+constexpr uint8_t FEATURE_RIVER = 1, FEATURE_STATE = 2, FEATURE_COUNTRY = 4, FEATURE_HIGHWAY = 8, FEATURE_ROAD = 16;
+
+// Roads are shown only when you are close enough for them to matter (km across the screen). They
+// exist at one level of detail only (North America), whatever level the land is drawn at.
+constexpr double HIGHWAYS_BELOW_KM = 1000;
+constexpr double ROADS_BELOW_KM = 250;
 
 // The level of detail to use for a view: the one the zoom asks for, or the next coarser one
 // until a level whose land layer covers everything on screen. -1 if the map has no land layer.

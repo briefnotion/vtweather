@@ -7,7 +7,8 @@
 // For each of three levels of detail (110m, 50m, 10m) it reads the land and lake polygons and the
 // country borders, state and province borders and rivers as lines, cuts the finest level down to
 // North America (the radar covers only the United States and the finest level is the largest) and
-// reads the cities (the 10m file inside North America, the 50m file elsewhere),
+// reads the roads (major highways, and other highways, of North America) and the cities (the 10m
+// file inside North America, the 50m file elsewhere),
 // drops points that do not matter at that level (Douglas-Peucker) and writes everything as whole
 // numbers of 1e-5 degrees.
 #include <algorithm>
@@ -223,6 +224,46 @@ bool read_layer(const std::string& folder, const Level& level, const char* what,
     return true;
 }
 
+// Roads: Natural Earth's 10 m roads file (the whole world; only North America is kept). Major highways
+// and beltways go in one layer, the other highways in another; the rest (local roads, ferries and
+// roads of unknown kind) are left out.
+constexpr double ROAD_TOLERANCE = 0.003;                       // degrees: roads are simplified more than coasts
+
+bool read_roads(const std::string& folder, vtw::BaseMap& map) {
+    const Level level{"10m", 2, ROAD_TOLERANCE, LEVELS[2].coverage};
+    const std::string path = folder + "/ne_10m_roads.geojson";
+    std::ifstream file(path);
+    if (!file) { std::fprintf(stderr, "cannot open %s (run tools/get_natural_earth.sh)\n", path.c_str()); return false; }
+    const Json json = Json::parse(file, nullptr, false);
+    if (json.is_discarded() || !json.contains("features")) { std::fprintf(stderr, "%s is not GeoJSON\n", path.c_str()); return false; }
+
+    vtw::MapLayer highways, others;
+    highways.kind = vtw::LayerKind::Highway; others.kind = vtw::LayerKind::Road;
+    highways.detail = others.detail = level.detail;
+    highways.coverage = others.coverage = level.coverage;
+    for (const Json& feature : json["features"]) {
+        const Json& geometry = feature["geometry"];
+        if (geometry.is_null()) continue;
+        const std::string type = feature["properties"]["type"].is_string() ? feature["properties"]["type"].get<std::string>() : "";
+        vtw::MapLayer* layer = nullptr;
+        if (type == "Major Highway" || type == "Beltway") layer = &highways;
+        else if (type == "Secondary Highway") layer = &others;
+        if (!layer) continue;
+        const std::string shape = geometry["type"];
+        if (shape == "LineString") add_line(geometry["coordinates"], level, *layer);
+        else if (shape == "MultiLineString")
+            for (const Json& line : geometry["coordinates"]) add_line(line, level, *layer);
+    }
+    size_t points[2] = {0, 0};
+    for (const vtw::MapLine& l : highways.lines) points[0] += l.points.size() / 2;
+    for (const vtw::MapLine& l : others.lines) points[1] += l.points.size() / 2;
+    std::printf("10m   highways %6zu shapes %8zu points\n10m   roads     %6zu shapes %8zu points\n",
+                highways.lines.size(), points[0], others.lines.size(), points[1]);
+    map.layers.push_back(std::move(highways));
+    map.layers.push_back(std::move(others));
+    return true;
+}
+
 // Cities from Natural Earth's populated places: the 10m file inside North America (the finest
 // level's area), the 50m file elsewhere. Names are kept as plain ASCII.
 constexpr int MIN_NORTH_AMERICA_POPULATION = 5000;
@@ -277,6 +318,7 @@ int main(int argc, char** argv) {
         if (!read_layer(argv[1], level, "states", vtw::LayerKind::State, map, "admin_1_states_provinces_lines")) return 1;
         if (!read_layer(argv[1], level, "rivers", vtw::LayerKind::River, map, "rivers_lake_centerlines")) return 1;
     }
+    if (!read_roads(argv[1], map)) return 1;
     if (!read_places(argv[1], map)) return 1;
     std::string error;
     if (!vtw::save_basemap(argv[2], map, error)) { std::fprintf(stderr, "%s\n", error.c_str()); return 1; }

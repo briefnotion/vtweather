@@ -96,6 +96,8 @@ void file_tests() {
     map.layers.push_back(layer_of(LayerKind::Lake, 2, GeoBox{5, -170, 75, -50}, {polygon_of({square(-1.5, -2.5, 3.25, 4.75)})}));
     map.layers.push_back(lines_of(LayerKind::River, 1, WORLD, {map_line({{0, 0}, {1.5, 2.25}, {3, 1}}), map_line({{-5, -5}, {-6, -7}})}));
     map.layers.push_back(lines_of(LayerKind::Country, 2, WORLD, {}));
+    map.layers.push_back(lines_of(LayerKind::Highway, 2, GeoBox{5, -170, 75, -50}, {map_line({{-100, 40}, {-99, 41}})}));
+    map.layers.push_back(lines_of(LayerKind::Road, 2, GeoBox{5, -170, 75, -50}, {}));
     map.places.push_back({-9712345, 3769000, 389965, "Wichita"});
     map.places.push_back({-12233000, 4760000, 737015, "Seattle"});
     map.places.push_back({100, -200, 0, ""});
@@ -104,7 +106,9 @@ void file_tests() {
     BaseMap back;
     std::string error;
     CHECK(vtw::read_basemap((const uint8_t*)bytes.data(), bytes.size(), back, error));
-    CHECK(back.layers.size() == 4);
+    CHECK(back.layers.size() == 6);
+    CHECK(back.layers[4].kind == LayerKind::Highway && back.layers[4].lines.size() == 1);
+    CHECK(back.layers[5].kind == LayerKind::Road && back.layers[5].lines.empty());
     CHECK(back.layers[2].kind == LayerKind::River && back.layers[2].lines.size() == 2);
     CHECK(back.layers[2].lines[0].points == map.layers[2].lines[0].points);
     CHECK_NEAR(back.layers[2].lines[0].box.north, 2.25, 1e-9);
@@ -428,6 +432,35 @@ void trace_tests() {
     CHECK(flagged(again, vtw::FEATURE_COUNTRY) > 10);
 }
 
+// roads show only when you are close enough, and from the one level of detail that has them
+void road_zoom_tests() {
+    BaseMap map;
+    const GeoBox america{5, -170, 75, -50};
+    map.layers.push_back(layer_of(LayerKind::Land, 0, WORLD, {polygon_of({square(-80, -170, 80, 170)})}));
+    map.layers.push_back(layer_of(LayerKind::Land, 1, WORLD, {polygon_of({square(-80, -170, 80, 170)})}));
+    map.layers.push_back(layer_of(LayerKind::Land, 2, america, {polygon_of({square(10, -160, 70, -60)})}));
+    map.layers.push_back(lines_of(LayerKind::Highway, 2, america, {map_line({{-100.5, 40}, {-99.5, 40}})}));
+    map.layers.push_back(lines_of(LayerKind::Road, 2, america, {map_line({{-100.5, 40.2}, {-99.5, 40.2}})}));
+    // too far out: neither kind; a little closer: highways only; close: both
+    for (double km : {3000.0, 1200.0}) {
+        GroundMap g(map);
+        g.update(make_view(40.1, -100, km, 100, 40));
+        CHECK(flagged(g, vtw::FEATURE_HIGHWAY) == 0 && flagged(g, vtw::FEATURE_ROAD) == 0);
+    }
+    for (double km : {900.0, 400.0, 300.0}) {
+        GroundMap g(map);
+        g.update(make_view(40.1, -100, km, 100, 40));
+        CHECK(flagged(g, vtw::FEATURE_ROAD) == 0);
+    }
+    for (double km : {300.0, 200.0, 50.0}) {
+        GroundMap g(map);
+        g.update(make_view(40.1, -100, km, 100, 40));
+        CHECK(flagged(g, vtw::FEATURE_HIGHWAY) > 0);
+        CHECK((flagged(g, vtw::FEATURE_ROAD) > 0) == (km < 250));
+        CHECK(flagged(g, vtw::FEATURE_RIVER | vtw::FEATURE_STATE | vtw::FEATURE_COUNTRY) == 0);      // roads set no other bits
+    }
+}
+
 void detail_tests() {
     // three levels; the finest covers only a box
     BaseMap map;
@@ -461,7 +494,7 @@ void real_tests() {
     CHECK(!path.empty());
     if (path.empty() || !vtw::load_basemap(path, map, error)) { std::printf("  %s\n", error.c_str()); CHECK(false); return; }
     CHECK(map.places.size() > 2000);                            // cities too
-    CHECK(map.layers.size() == 15);                          // five layers at each of three levels
+    CHECK(map.layers.size() == 17);                          // five layers at each of three levels, and two kinds of road
 
     struct Place { const char* name; double lat, lon; Ground ground; };
     const Place places[] = {
@@ -510,10 +543,16 @@ void real_tests() {
     CHECK(features_near_middle(32.0, -100.0, 3000, vtw::FEATURE_COUNTRY, 50, 20) > 10);       // Mexico, at the coarse level
     CHECK(features_near_middle(38.65, -90.18, 40, vtw::FEATURE_RIVER, 50, 20) > 10);          // the Mississippi at St. Louis
     CHECK(features_near_middle(39.0, -97.0, 3000, vtw::FEATURE_STATE, 50, 20) > 20);          // state lines, coarse
+    CHECK(features_near_middle(47.6, -122.33, 60, vtw::FEATURE_HIGHWAY, 25, 10) > 8);          // Interstate 5 through Seattle
+    CHECK(features_near_middle(37.7, -97.3, 120, vtw::FEATURE_HIGHWAY, 40, 15) > 20);          // highways around Wichita
+    CHECK(features_near_middle(37.7, -97.3, 150, vtw::FEATURE_ROAD, 40, 15) > 20);             // and the other highways
+    CHECK(features_near_middle(37.7, -97.3, 1500, vtw::FEATURE_HIGHWAY, 50, 20) == 0);         // none when zoomed out
+    CHECK(features_near_middle(37.7, -97.3, 600, vtw::FEATURE_ROAD, 50, 20) == 0);             // other highways only when close
+    CHECK(features_near_middle(37.7, -97.3, 600, vtw::FEATURE_HIGHWAY, 50, 20) > 20);
     {
         GroundMap ocean(map);
         ocean.update(make_view(35, -140, 600, 100, 40));                               // the open Pacific
-        CHECK(flagged(ocean, 7) == 0);
+        CHECK(flagged(ocean, 31) == 0);
     }
 
     // how much land a view of the continental US shows: a good part of it, not all and not none
@@ -542,6 +581,7 @@ int main() {
     simplify_line_tests();
     fill_tests();
     trace_tests();
+    road_zoom_tests();
     detail_tests();
     real_tests();
     if (failures == 0) std::printf("all base map tests passed\n");

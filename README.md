@@ -4,7 +4,7 @@ An overhead map of where you are, zoomable, with the real-time rain on it, drawn
 letters in a terminal. Built on [vtscreen](https://github.com/briefnotion/vtscreen).
 
 **Status:** it works end to end, in a first form. It reads its settings, draws the land and water
-(a base map made from Natural Earth data, with rivers, borders and city names), asks NOAA's radar service for a picture of the area on
+(a base map made from Natural Earth data, with rivers, borders, major roads and city names), asks NOAA's radar service for a picture of the area on
 screen (in the background, so the screen never waits), turns the colours into rain strengths and
 draws the rain as letters on top. You can zoom and move around with the keys. It follows the window
 being resized, and fetches the radar again every few minutes and when the view moves off the
@@ -87,18 +87,23 @@ for every press. Zooming in never needs a new picture: the radar's own detail is
 
 ## The base map
 
-The ground is drawn from `data/basemap.bin` (3 MB), a compact file of land and lake polygons, of
-country borders, state and province borders and rivers as lines, and of about 2300 cities, which the program reads itself
+The ground is drawn from `data/basemap.bin` (4 MB), a compact file of land and lake polygons, of
+country borders, state and province borders, rivers and roads as lines, and of about 2300 cities, which the program reads itself
 (`src/basemap.cpp`). It was made from [Natural Earth](https://www.naturalearthdata.com) (public
 domain) at three levels of detail, about 1:110 million for views of thousands of kilometres,
 1:50 million for hundreds and 1:10 million for close views; the finest level covers North America
 only, since that is all the radar covers, and elsewhere a close view uses the next level.
 
-Water is a dark blue background and land a dark green one with faint dots. Rivers, state borders,
-country borders and the coast are lines, each a step brighter than the last (blue, violet, pink,
-tan), all kept dim so the rain stands out; without colour water is blank, land is faint dots and
+Water is a dark blue background and land a dark green one with faint dots. Rivers, roads, state
+borders, country borders and the coast are lines, each a step brighter than the last (blue, amber,
+violet, pink, tan), all kept dim so the rain stands out; without colour water is blank, land is faint dots and
 each kind of line has its own brightness. The ground of a view is worked out again only when the
 view changes.
+
+Roads are the major highways (Interstates and the like, brighter amber) and the other highways
+(darker amber) of North America, from Natural Earth's 10 m roads. They are shown only when you are
+close enough for them to matter: major highways below 1000 km across the screen and the other
+highways below 250 km. There are no local streets.
 
 City names (`n` hides them) are a dot and the name beside it, as text so they are always readable,
 white for big cities and grey for small ones. A view of thousands of kilometres shows only the
@@ -111,7 +116,7 @@ ground.
 
 To remake the file (only needed if the map data changes):
 
-    ./tools/get_natural_earth.sh                          downloads the GeoJSON (about 75 MB), once, politely
+    ./tools/get_natural_earth.sh                          downloads the GeoJSON (about 125 MB, the roads being 50 of it), once, politely
     ./build/make_basemap tools/natural_earth data/basemap.bin
 
 ## Seeing the rain
@@ -172,7 +177,7 @@ mapping", start the program with `setarch x86_64 -R`).
 
 ## Third-party code and data
 
-- [Natural Earth](https://www.naturalearthdata.com) (public domain): the land, lake, border, river and city data in `data/basemap.bin`. Natural
+- [Natural Earth](https://www.naturalearthdata.com) (public domain): the land, lake, border, river, road and city data in `data/basemap.bin`. Natural
   Earth asks for no credit; "Made with Natural Earth" is its suggested line.
 - [vtscreen](https://github.com/briefnotion/vtscreen) (MIT), the drawing library, in `vtscreen/`.
 - [nlohmann/json](https://github.com/nlohmann/json) (MIT), in `third_party/json/`, pinned to

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Download the Natural Earth map files that the base map is made from (public domain,
-# https://www.naturalearthdata.com). They are plain GeoJSON, about 75 MB in all, kept in
+# https://www.naturalearthdata.com). They are plain GeoJSON, about 125 MB in all, kept in
 # tools/natural_earth/ (not in the repo). This is only needed to remake data/basemap.bin.
 #
 # Kind to the host: one file at a time, 5 seconds apart, each fetched only if it is missing,
@@ -16,7 +16,7 @@ FILES="ne_110m_land ne_110m_lakes ne_50m_land ne_50m_lakes ne_10m_land ne_10m_la
        ne_110m_admin_0_boundary_lines_land ne_50m_admin_0_boundary_lines_land ne_10m_admin_0_boundary_lines_land
        ne_110m_admin_1_states_provinces_lines ne_50m_admin_1_states_provinces_lines ne_10m_admin_1_states_provinces_lines
        ne_110m_rivers_lake_centerlines ne_50m_rivers_lake_centerlines ne_10m_rivers_lake_centerlines
-       ne_50m_populated_places ne_10m_populated_places"
+       ne_50m_populated_places ne_10m_populated_places ne_10m_roads"
 
 first=1
 for name in $FILES; do

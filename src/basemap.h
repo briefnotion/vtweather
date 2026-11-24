@@ -1,4 +1,4 @@
-// BaseMap: the land and water of the earth as polygons, its borders and rivers as lines, and its
+// BaseMap: the land and water of the earth as polygons, its borders, rivers and roads as lines, and its
 // cities as points with names, read from a compact binary file (data/basemap.bin). The file is made once, at development time, from Natural Earth's public
 // domain map data by tools/make_basemap.cpp; the program only reads it.
 //
@@ -9,7 +9,7 @@
 // a metre).
 //
 // File format, little-endian:  "VTWMAP3\n"; u32 layers; for each layer: u8 kind (0 land, 1 lake,
-// 2 country border, 3 state border, 4 river), u8 detail (0, 1, 2), u16 0, i32 south, west, north,
+// 2 country border, 3 state border, 4 river, 5 major highway, 6 other highway), u8 detail (0, 1, 2), u16 0, i32 south, west, north,
 // east of its coverage, u32 count. For land and lake layers the count is of polygons, each: i32
 // south, west, north, east, u32 rings, and for each ring u32 points then that many i32 pairs
 // (longitude, latitude). For the line layers the count is of lines, each: i32 south, west, north,
@@ -28,8 +28,8 @@ namespace vtw {
 
 constexpr double MAP_UNITS_PER_DEGREE = 100000.0;
 
-enum class LayerKind : uint8_t { Land = 0, Lake = 1, Country = 2, State = 3, River = 4 };
-constexpr int LAYER_KINDS = 5;
+enum class LayerKind : uint8_t { Land = 0, Lake = 1, Country = 2, State = 3, River = 4, Highway = 5, Road = 6 };
+constexpr int LAYER_KINDS = 7;
 constexpr bool is_line_layer(LayerKind kind) { return kind >= LayerKind::Country; }
 constexpr int DETAIL_LEVELS = 3;                 // 0 coarse (world), 1 medium, 2 fine
 

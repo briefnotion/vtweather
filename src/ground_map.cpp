@@ -177,6 +177,15 @@ void GroundMap::update(const View& view) {
         if (const MapLayer* layer = find_layer(map_, kind.kind, detail_))
             for (const MapLine& line : layer->lines)
                 if (overlaps(line.box, screen)) tracer.trace(line, kind.bit);
+
+    // roads: one level of detail, and only when close enough
+    const struct { LayerKind kind; uint8_t bit; double below_km; } roads[] = {
+        {LayerKind::Road, FEATURE_ROAD, ROADS_BELOW_KM}, {LayerKind::Highway, FEATURE_HIGHWAY, HIGHWAYS_BELOW_KM}};
+    for (const auto& road : roads)
+        if (view.zoom_km() < road.below_km)
+            if (const MapLayer* layer = find_layer(map_, road.kind, DETAIL_LEVELS - 1))
+                for (const MapLine& line : layer->lines)
+                    if (overlaps(line.box, screen)) tracer.trace(line, road.bit);
 }
 
 }  // namespace vtw
