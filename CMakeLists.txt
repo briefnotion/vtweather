@@ -69,7 +69,7 @@ add_test(NAME vtweather_worker_tests COMMAND vtweather_worker_tests)
 
 # the cell grid and drawing the rain
 add_executable(vtweather_draw_tests tests/draw_tests.cpp src/cell_grid.cpp src/draw_radar.cpp src/view.cpp
-               src/radar_frame.cpp src/png.cpp src/inflate.cpp)
+               src/radar_frame.cpp src/png.cpp src/inflate.cpp src/draw_ground.cpp src/ground_map.cpp src/basemap.cpp)
 target_include_directories(vtweather_draw_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 add_test(NAME vtweather_draw_tests COMMAND vtweather_draw_tests)
 

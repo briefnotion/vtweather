@@ -130,11 +130,16 @@ domain) at three levels of detail, about 1:110 million for views of thousands of
 1:50 million for hundreds and 1:10 million for close views; the finest level covers North America
 only, since that is all the radar covers, and elsewhere a close view uses the next level.
 
-Water is a dark blue background and land a dark green one with faint dots. Rivers, roads, state
-borders, country borders and the coast are lines, each a step brighter than the last (blue, amber,
-violet, pink, tan), all kept dim so the rain stands out; without colour water is blank, land is faint dots and
-each kind of line has its own brightness. The ground of a view is worked out again only when the
-view changes.
+Water is a flat navy (8, 22, 48): its letters are the same navy as its background, so in colour you
+see a plain navy block, and without colour you see faint dots that hardly move (the shimmer is set
+as low as it can be without stopping, one change of letter in about 80 seconds). Land has no colour
+and no letters at all: it shows your terminal's own background, which is empty without colour.
+Rivers, roads, state borders, country borders and the coast are lines of letters on the land, each a
+step brighter than the last (blue, amber, violet, pink, tan) and all kept dim so the rain stands out;
+they have no background colour of their own. The ground of a view is worked out again only when the
+view changes. The file is found in `data/` of the folder you run from, or `../data/`, or the source
+tree it was built from; `--basemap FILE` names another. Without one the program still runs, with no
+ground.
 
 Roads are the major highways (Interstates and the like, brighter amber) and the other highways
 (darker amber) of North America, from Natural Earth's 10 m roads. They are shown only when you are

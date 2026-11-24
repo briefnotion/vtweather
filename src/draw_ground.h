@@ -1,8 +1,8 @@
-// Drawing the ground: water, land and coast, with rivers and borders, kept dim (so rain and
-// everything else stands out) and readable without colour: water is left blank, land is a faint
-// scatter of dots, and rivers, roads, state borders, country borders and the coast are lines, each
-// a step brighter than the last. In colour, water is a dark blue background, land a dark green one,
-// and the lines are blue (rivers), amber (roads, the major highways brighter), violet (states), pink
+// Drawing the ground. Water is navy letters on a navy background: in colour, a plain navy block; without
+// colour, faint dots that hardly move. Land has no colour and no letters (it shows the terminal's own
+// background). Rivers, roads, state borders, country borders and the coast are lines of letters on it,
+// kept dim (so the rain stands out) and each a step brighter than the last, so they differ even
+// without colour: blue (rivers), amber (roads, the major highways brighter), violet (states), pink
 // (countries) and tan (the coast).
 #pragma once
 

@@ -1,10 +1,13 @@
 // Tests for the cell grid and for drawing the rain.
 #include <algorithm>
+#include <cmath>
 #include <string>
+#include <vector>
 
 #include "check.h"
 
 #include "../src/cell_grid.h"
+#include "../src/draw_ground.h"
 #include "../src/draw_radar.h"
 
 namespace {
@@ -139,6 +142,119 @@ void legend_tests() {
     }
 }
 
+// ---- the ground: water, land, and the lines on the land
+
+vtw::MapPolygon ground_square(double south, double west, double north, double east) {
+    auto u = [](double d) { return (int32_t)std::lround(d * vtw::MAP_UNITS_PER_DEGREE); };
+    vtw::MapPolygon p;
+    p.rings.push_back({u(west), u(south), u(east), u(south), u(east), u(north), u(west), u(north)});
+    p.box = {south, west, north, east};
+    return p;
+}
+
+vtw::MapLine ground_line(double lon0, double lat0, double lon1, double lat1) {
+    auto u = [](double d) { return (int32_t)std::lround(d * vtw::MAP_UNITS_PER_DEGREE); };
+    vtw::MapLine l;
+    l.points = {u(lon0), u(lat0), u(lon1), u(lat1)};
+    l.box = {std::min(lat0, lat1), std::min(lon0, lon1), std::max(lat0, lat1), std::max(lon0, lon1)};
+    return l;
+}
+
+void ground_tests() {
+    // an island with a river, a road, a state border and a country border across it, in a sea
+    vtw::BaseMap map;
+    const vtw::GeoBox world{-90, -180, 90, 180};
+    auto polygon_layer = [&](vtw::LayerKind kind, std::vector<vtw::MapPolygon> polygons) {
+        vtw::MapLayer l; l.kind = kind; l.detail = 2; l.coverage = world; l.polygons = std::move(polygons); return l;
+    };
+    auto line_layer = [&](vtw::LayerKind kind, vtw::MapLine line) {
+        vtw::MapLayer l; l.kind = kind; l.detail = 2; l.coverage = world; l.lines.push_back(std::move(line)); return l;
+    };
+    map.layers.push_back(polygon_layer(vtw::LayerKind::Land, {ground_square(-2, -2, 2, 2)}));
+    map.layers.push_back(line_layer(vtw::LayerKind::River, ground_line(-1.5, 1.2, 1.5, 1.2)));
+    map.layers.push_back(line_layer(vtw::LayerKind::State, ground_line(-1.5, -0.6, 1.5, -0.6)));
+    map.layers.push_back(line_layer(vtw::LayerKind::Country, ground_line(-1.5, -1.2, 1.5, -1.2)));
+    vtw::View view;
+    view.set_cell_aspect(2.0);
+    view.set_centre({0, 0});
+    view.set_zoom_km(700);
+    view.set_size(120, 50);
+    vtw::GroundMap ground(map);
+    ground.update(view);
+    const int rows = 50, cols = 120;
+    vtscreen::Picture picture;
+    picture.init(rows, cols);
+    vtw::draw_ground(ground, picture);
+
+    int water = 0, plain_land = 0, coast = 0, country = 0, state = 0, river = 0;
+    for (int row = 0; row < rows; row++)
+        for (int col = 0; col < cols; col++) {
+            const vtscreen::PicCell& c = picture.at(row, col);
+            const vtw::Ground kind = ground.at(col, row);
+            const uint8_t f = ground.features_at(col, row);
+            if (kind == vtw::Ground::Water) {
+                water++;
+                // navy letters on a navy background: the same colour, so in colour the letters cannot be seen
+                CHECK(c.r == 8 && c.g == 22 && c.b == 48);
+                CHECK(c.alt_lum == 1.0 && c.alt_r == c.r && c.alt_g == c.g && c.alt_b == c.b);
+                // just above the first of the 16 brightness steps, so that without colour there are letters,
+                // and a shimmer that is not zero but as low as it gets
+                CHECK(c.lum >= 1.0 / 16 && c.lum < 2.0 / 16);
+                CHECK(c.shimmer > 0 && c.shimmer <= 0.002);
+                CHECK(!c.text);
+            } else if (f == 0 && kind == vtw::Ground::Land) {
+                plain_land++;                                       // land: no colour and no letters, untouched
+                CHECK(c.lum == 0 && c.alt_lum == 0 && c.r == 0 && c.g == 0 && c.b == 0 && c.shimmer == 1 && !c.text);
+            } else {
+                CHECK(c.alt_lum == 0);                              // lines on the land: letters only, no colour behind them
+                CHECK(c.lum > 0.1 && c.lum < 0.36);                 // dim, below the rain
+                if (f & vtw::FEATURE_COUNTRY) { country++; CHECK(c.lum == 0.26 && c.r == 215); }
+                else if (f & vtw::FEATURE_STATE) { state++; CHECK(c.lum == 0.20 && c.r == 150); }
+                else if (kind == vtw::Ground::Coast) { coast++; CHECK(c.lum == 0.33 && c.r == 190); }
+                else if (f & vtw::FEATURE_RIVER) { river++; CHECK(c.lum == 0.15 && c.r == 70); }
+            }
+        }
+    CHECK(water > 500 && plain_land > 500 && coast > 20 && country > 10 && state > 10 && river > 10);
+
+    // how it looks as letters. Without colour the water is faint dots and the land is empty (the other way
+    // round from how it was); with colour the water is one flat navy
+    auto lines_of = [&](const std::string& text) {
+        std::vector<std::string> lines;
+        for (size_t at = 0; at < text.size();) {
+            const size_t end = text.find('\n', at);
+            lines.push_back(text.substr(at, end == std::string::npos ? std::string::npos : end - at));
+            if (end == std::string::npos) break;
+            at = end + 1;
+        }
+        return lines;
+    };
+    const std::string plain = vtscreen::render_plain(picture, rows, cols, 0.0, 30, false, false, false);
+    const std::vector<std::string> lines = lines_of(plain);
+    CHECK((int)lines.size() == rows);
+    int dotted_water = 0, blank_land = 0, stray = 0;
+    for (int row = 0; row < rows && row < (int)lines.size(); row++)
+        for (int col = 0; col < cols && col < (int)lines[row].size(); col++) {
+            const char ch = lines[row][col];
+            const vtw::Ground kind = ground.at(col, row);
+            if (kind == vtw::Ground::Water) {
+                if (ch == '.' || ch == '`' || ch == '\'') dotted_water++;
+                else stray++;
+            } else if (ground.features_at(col, row) == 0 && kind == vtw::Ground::Land) {
+                if (ch == ' ') blank_land++;
+                else stray++;
+            }
+        }
+    CHECK(stray == 0 && dotted_water == water && blank_land == plain_land);
+
+    // the water hardly moves: the same ten seconds later, but it does move over a few minutes
+    CHECK(vtscreen::render_plain(picture, rows, cols, 10.0, 30, false, false, false) == plain);
+    CHECK(vtscreen::render_plain(picture, rows, cols, 400.0, 30, false, false, false) != plain);
+
+    // with colour, the letter colour and the background colour sent for water are the same
+    const std::string coloured = vtscreen::render_plain(picture, rows, cols, 0.0, 30, true, false, false);
+    CHECK(coloured.find("38;2;0;17;51") != std::string::npos && coloured.find("48;2;0;17;51") != std::string::npos);
+}
+
 }  // namespace
 
 int main() {
@@ -146,6 +262,7 @@ int main() {
     look_tests();
     draw_tests();
     legend_tests();
+    ground_tests();
     if (failures == 0) std::printf("all drawing tests passed\n");
     else std::printf("%d check(s) failed\n", failures);
     return failures;

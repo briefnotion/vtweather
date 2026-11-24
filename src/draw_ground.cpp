@@ -4,21 +4,37 @@ namespace vtw {
 
 namespace {
 
-// Each kind of thing has its own brightness, a step apart, so that they can be told apart even
-// without colour (and all stay below the rain, which starts at 0.36).
-constexpr double LAND_BRIGHTNESS = 0.09;
+// Each line has its own brightness, a step apart, so that they can be told apart even without colour
+// (and all stay below the rain, which starts at 0.36).
 constexpr double RIVER_BRIGHTNESS = 0.15;
+constexpr double ROAD_BRIGHTNESS = 0.16;
 constexpr double STATE_BRIGHTNESS = 0.20;
+constexpr double HIGHWAY_BRIGHTNESS = 0.23;
 constexpr double COUNTRY_BRIGHTNESS = 0.26;
 constexpr double COAST_BRIGHTNESS = 0.33;
-constexpr double ROAD_BRIGHTNESS = 0.16;
-constexpr double HIGHWAY_BRIGHTNESS = 0.23;
 
-void set_ground(vtscreen::PicCell& cell, double brightness, int r, int g, int b, int back_r, int back_g, int back_b) {
+// Water: navy letters on a navy background, so in colour the letters cannot be seen, and the water
+// is a plain navy block. Without colour the letters show: the brightness is the lowest that makes
+// any (a hair above the first of the 16 steps, 1/16, where the group of faint dots starts), and the
+// shimmer is as low as it can be without stopping altogether, one change of letter in about 80
+// seconds, so the water barely moves.
+constexpr double WATER_BRIGHTNESS = 0.07;
+constexpr double WATER_SHIMMER = 0.001;
+constexpr int WATER_R = 8, WATER_G = 22, WATER_B = 48;
+
+// Land has no colour of its own and no letters: it is left as it is, showing the terminal's own
+// background. Lines on the land are letters only, with no background colour.
+void set_line(vtscreen::PicCell& cell, double brightness, int r, int g, int b) {
     cell.lum = brightness;
     cell.r = r; cell.g = g; cell.b = b;
-    cell.alt_lum = 1.0;                              // the colour behind the letters
-    cell.alt_r = back_r; cell.alt_g = back_g; cell.alt_b = back_b;
+}
+
+void set_water(vtscreen::PicCell& cell) {
+    cell.lum = WATER_BRIGHTNESS;
+    cell.shimmer = WATER_SHIMMER;
+    cell.r = WATER_R; cell.g = WATER_G; cell.b = WATER_B;                 // the letters,
+    cell.alt_lum = 1.0;                                                   // and the colour behind them: the same
+    cell.alt_r = WATER_R; cell.alt_g = WATER_G; cell.alt_b = WATER_B;
 }
 
 }  // namespace
@@ -30,22 +46,20 @@ void draw_ground(const GroundMap& ground, vtscreen::Picture& picture) {
             const Ground kind = ground.at(col, row);
             const uint8_t features = ground.features_at(col, row);
             if (kind == Ground::Water) {
-                set_ground(cell, 0.0, 0, 0, 0, 8, 22, 48);
+                set_water(cell);
             } else if (features & FEATURE_COUNTRY) {                 // borders and rivers show on land and coast
-                set_ground(cell, COUNTRY_BRIGHTNESS, 215, 120, 150, 12, 24, 12);
+                set_line(cell, COUNTRY_BRIGHTNESS, 215, 120, 150);
             } else if (features & FEATURE_STATE) {
-                set_ground(cell, STATE_BRIGHTNESS, 150, 120, 175, 12, 24, 12);
+                set_line(cell, STATE_BRIGHTNESS, 150, 120, 175);
             } else if (kind == Ground::Coast) {
-                set_ground(cell, COAST_BRIGHTNESS, 190, 170, 120, 12, 24, 12);
+                set_line(cell, COAST_BRIGHTNESS, 190, 170, 120);
             } else if (features & FEATURE_HIGHWAY) {
-                set_ground(cell, HIGHWAY_BRIGHTNESS, 230, 180, 85, 12, 24, 12);
+                set_line(cell, HIGHWAY_BRIGHTNESS, 230, 180, 85);
             } else if (features & FEATURE_ROAD) {
-                set_ground(cell, ROAD_BRIGHTNESS, 165, 135, 80, 12, 24, 12);
+                set_line(cell, ROAD_BRIGHTNESS, 165, 135, 80);
             } else if (features & FEATURE_RIVER) {
-                set_ground(cell, RIVER_BRIGHTNESS, 70, 140, 205, 12, 24, 12);
-            } else {
-                set_ground(cell, LAND_BRIGHTNESS, 60, 90, 55, 12, 24, 12);
-            }
+                set_line(cell, RIVER_BRIGHTNESS, 70, 140, 205);
+            }                                                        // plain land: nothing at all
         }
 }
 
