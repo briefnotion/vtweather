@@ -72,6 +72,53 @@ private:
     std::vector<std::vector<double>> crossings_;     // per row: where the outline crosses it
 };
 
+// Mark the cells a line passes through. The line is cut to the screen first, so that a line that
+// runs far outside costs nothing, then followed in steps of half a cell.
+class Tracer {
+public:
+    Tracer(const View& view, std::vector<uint8_t>& marks) : view_(view), marks_(marks) {}
+
+    void trace(const MapLine& line, uint8_t bit) {
+        const size_t n = line.points.size() / 2;
+        double px = 0, py = 0;
+        for (size_t i = 0; i < n; i++) {
+            double x, y;
+            view_.to_cell(GeoPoint{line.points[2 * i + 1] / MAP_UNITS_PER_DEGREE, line.points[2 * i] / MAP_UNITS_PER_DEGREE}, x, y);
+            if (i > 0) segment(px, py, x, y, bit);
+            px = x; py = y;
+        }
+    }
+
+private:
+    void segment(double x0, double y0, double x1, double y1, uint8_t bit) {
+        const double width = view_.cols(), height = view_.rows();
+        double t0 = 0, t1 = 1;
+        const double dx = x1 - x0, dy = y1 - y0;
+        const double p[4] = {-dx, dx, -dy, dy};
+        const double q[4] = {x0, width - x0, y0, height - y0};
+        for (int i = 0; i < 4; i++) {
+            if (p[i] == 0) {
+                if (q[i] < 0) return;
+            } else {
+                const double t = q[i] / p[i];
+                if (p[i] < 0) { if (t > t1) return; t0 = std::max(t0, t); }
+                else { if (t < t0) return; t1 = std::min(t1, t); }
+            }
+        }
+        const double ax = x0 + t0 * dx, ay = y0 + t0 * dy, bx = x0 + t1 * dx, by = y0 + t1 * dy;
+        const int steps = (int)std::ceil(std::max(std::fabs(bx - ax), std::fabs(by - ay)) * 2) + 1;
+        for (int k = 0; k <= steps; k++) {
+            const double t = (double)k / steps;
+            const int col = std::min(view_.cols() - 1, std::max(0, (int)std::floor(ax + (bx - ax) * t)));
+            const int row = std::min(view_.rows() - 1, std::max(0, (int)std::floor(ay + (by - ay) * t)));
+            marks_[(size_t)row * view_.cols() + col] |= bit;
+        }
+    }
+
+    const View& view_;
+    std::vector<uint8_t>& marks_;
+};
+
 }  // namespace
 
 int choose_detail(const BaseMap& map, const View& view) {
@@ -96,6 +143,7 @@ void GroundMap::update(const View& view) {
     zoom_ = view.zoom_km(); aspect_ = view.cell_aspect(); heading_ = view.heading(); centre_ = view.centre();
 
     cells_.assign((size_t)cols_ * rows_, (uint8_t)Ground::Water);
+    features_.assign((size_t)cols_ * rows_, 0);
     detail_ = choose_detail(map_, view);
     if (detail_ < 0) return;
 
@@ -119,6 +167,16 @@ void GroundMap::update(const View& view) {
                                     (row + 1 < rows_ && !land[(size_t)(row + 1) * cols_ + col]);
             cells_[(size_t)row * cols_ + col] = (uint8_t)(water_near ? Ground::Coast : Ground::Land);
         }
+
+    // rivers and borders
+    Tracer tracer(view, features_);
+    const struct { LayerKind kind; uint8_t bit; } lines[] = {{LayerKind::River, FEATURE_RIVER},
+                                                             {LayerKind::State, FEATURE_STATE},
+                                                             {LayerKind::Country, FEATURE_COUNTRY}};
+    for (const auto& kind : lines)
+        if (const MapLayer* layer = find_layer(map_, kind.kind, detail_))
+            for (const MapLine& line : layer->lines)
+                if (overlaps(line.box, screen)) tracer.trace(line, kind.bit);
 }
 
 }  // namespace vtw

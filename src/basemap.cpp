@@ -11,9 +11,10 @@ namespace vtw {
 
 namespace {
 
-constexpr char MAGIC[8] = {'V', 'T', 'W', 'M', 'A', 'P', '1', '\n'};
+constexpr char MAGIC[8] = {'V', 'T', 'W', 'M', 'A', 'P', '2', '\n'};
 constexpr uint32_t MAX_LAYERS = 64;
 constexpr uint32_t MAX_POLYGONS = 2000000;
+constexpr uint32_t MAX_LINES = 4000000;
 constexpr uint32_t MAX_RINGS = 1000000;
 constexpr uint64_t MAX_POINTS = 20000000;
 
@@ -75,28 +76,43 @@ bool read_basemap(const uint8_t* data, size_t size, BaseMap& map, std::string& e
         MapLayer layer;
         const uint8_t kind = in.u8(), detail = in.u8();
         in.u8(); in.u8();
-        if (kind > 1 || detail >= DETAIL_LEVELS) return fail("the base map file is damaged");
+        if (kind >= LAYER_KINDS || detail >= DETAIL_LEVELS) return fail("the base map file is damaged");
         layer.kind = (LayerKind)kind;
         layer.detail = detail;
         layer.coverage = read_box(in);
-        const uint32_t polygons = in.u32();
-        if (in.bad || polygons > MAX_POLYGONS || (uint64_t)polygons * 20 > in.left()) return fail("the base map file is damaged");
-        layer.polygons.reserve(polygons);
-        for (uint32_t p = 0; p < polygons; p++) {
-            MapPolygon polygon;
-            polygon.box = read_box(in);
-            const uint32_t rings = in.u32();
-            if (in.bad || rings > MAX_RINGS || (uint64_t)rings * 4 > in.left()) return fail("the base map file is damaged");
-            polygon.rings.reserve(rings);
-            for (uint32_t r = 0; r < rings; r++) {
-                const uint32_t count = in.u32();
-                points += count;
-                if (in.bad || points > MAX_POINTS || (uint64_t)count * 8 > in.left()) return fail("the base map file is damaged");
-                std::vector<int32_t> ring((size_t)count * 2);
-                for (int32_t& v : ring) v = in.i32();
-                polygon.rings.push_back(std::move(ring));
+        const uint32_t count = in.u32();
+        if (in.bad || (is_line_layer(layer.kind) ? count > MAX_LINES : count > MAX_POLYGONS) || (uint64_t)count * 20 > in.left())
+            return fail("the base map file is damaged");
+        if (is_line_layer(layer.kind)) {
+            layer.lines.reserve(count);
+            for (uint32_t i = 0; i < count; i++) {
+                MapLine line;
+                line.box = read_box(in);
+                const uint32_t n = in.u32();
+                points += n;
+                if (in.bad || points > MAX_POINTS || (uint64_t)n * 8 > in.left()) return fail("the base map file is damaged");
+                line.points.resize((size_t)n * 2);
+                for (int32_t& v : line.points) v = in.i32();
+                layer.lines.push_back(std::move(line));
             }
-            layer.polygons.push_back(std::move(polygon));
+        } else {
+            layer.polygons.reserve(count);
+            for (uint32_t p = 0; p < count; p++) {
+                MapPolygon polygon;
+                polygon.box = read_box(in);
+                const uint32_t rings = in.u32();
+                if (in.bad || rings > MAX_RINGS || (uint64_t)rings * 4 > in.left()) return fail("the base map file is damaged");
+                polygon.rings.reserve(rings);
+                for (uint32_t r = 0; r < rings; r++) {
+                    const uint32_t n = in.u32();
+                    points += n;
+                    if (in.bad || points > MAX_POINTS || (uint64_t)n * 8 > in.left()) return fail("the base map file is damaged");
+                    std::vector<int32_t> ring((size_t)n * 2);
+                    for (int32_t& v : ring) v = in.i32();
+                    polygon.rings.push_back(std::move(ring));
+                }
+                layer.polygons.push_back(std::move(polygon));
+            }
         }
         if (in.bad) return fail("the base map file is damaged");
         map.layers.push_back(std::move(layer));
@@ -135,6 +151,15 @@ std::string write_basemap(const BaseMap& map) {
         s += '\0';
         s += '\0';
         put_box(s, layer.coverage);
+        if (is_line_layer(layer.kind)) {
+            put32(s, (uint32_t)layer.lines.size());
+            for (const MapLine& line : layer.lines) {
+                put_box(s, line.box);
+                put32(s, (uint32_t)(line.points.size() / 2));
+                for (int32_t v : line.points) put_i32(s, v);
+            }
+            continue;
+        }
         put32(s, (uint32_t)layer.polygons.size());
         for (const MapPolygon& polygon : layer.polygons) {
             put_box(s, polygon.box);
@@ -156,6 +181,45 @@ bool save_basemap(const std::string& path, const BaseMap& map, std::string& erro
         return false;
     }
     return true;
+}
+
+std::vector<int32_t> simplify_line(const std::vector<int32_t>& line, double tolerance_degrees) {
+    const size_t n = line.size() / 2;
+    if (n < 2) return {};
+    if (tolerance_degrees <= 0 || n < 3) return line;
+    const double tolerance = tolerance_degrees * MAP_UNITS_PER_DEGREE;
+    auto x = [&](size_t i) { return (double)line[2 * i]; };
+    auto y = [&](size_t i) { return (double)line[2 * i + 1]; };
+    auto distance = [&](size_t p, size_t a, size_t b) {
+        const double dx = x(b) - x(a), dy = y(b) - y(a);
+        const double length2 = dx * dx + dy * dy;
+        if (length2 == 0) return std::hypot(x(p) - x(a), y(p) - y(a));
+        double t = ((x(p) - x(a)) * dx + (y(p) - y(a)) * dy) / length2;
+        t = std::min(std::max(t, 0.0), 1.0);
+        return std::hypot(x(p) - (x(a) + t * dx), y(p) - (y(a) + t * dy));
+    };
+    std::vector<bool> keep(n, false);
+    keep[0] = keep[n - 1] = true;
+    std::vector<std::pair<size_t, size_t>> work{{0, n - 1}};
+    while (!work.empty()) {
+        const auto [a, b] = work.back();
+        work.pop_back();
+        double worst = -1;
+        size_t at = 0;
+        for (size_t i = a + 1; i < b; i++) {
+            const double d = distance(i, a, b);
+            if (d > worst) { worst = d; at = i; }
+        }
+        if (worst > tolerance) {
+            keep[at] = true;
+            work.push_back({a, at});
+            work.push_back({at, b});
+        }
+    }
+    std::vector<int32_t> out;
+    for (size_t i = 0; i < n; i++)
+        if (keep[i]) { out.push_back(line[2 * i]); out.push_back(line[2 * i + 1]); }
+    return out;
 }
 
 std::vector<int32_t> simplify_ring(const std::vector<int32_t>& ring, double tolerance_degrees) {

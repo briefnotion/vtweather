@@ -4,10 +4,11 @@
 //   ./tools/get_natural_earth.sh                       (downloads the files, once)
 //   ./build/make_basemap tools/natural_earth data/basemap.bin
 //
-// For each of three levels of detail (110m, 50m, 10m) it reads the land and lake polygons,
-// cuts the finest level down to North America (the radar covers only the United States and the
-// finest level is the largest), drops points that do not matter at that level (Douglas-Peucker)
-// and writes everything as whole numbers of 1e-5 degrees.
+// For each of three levels of detail (110m, 50m, 10m) it reads the land and lake polygons and the
+// country borders, state and province borders and rivers as lines, cuts the finest level down to
+// North America (the radar covers only the United States and the finest level is the largest),
+// drops points that do not matter at that level (Douglas-Peucker) and writes everything as whole
+// numbers of 1e-5 degrees.
 #include <algorithm>
 #include <cstdio>
 #include <fstream>
@@ -94,6 +95,79 @@ std::vector<int32_t> convert_ring(const Json& ring, const Level& level) {
     return vtw::simplify_ring(units, level.tolerance);
 }
 
+// Liang-Barsky: the part of a segment inside the box, if any (in the same longitude, latitude units).
+bool clip_segment(Point& a, Point& b, const vtw::GeoBox& box) {
+    double t0 = 0, t1 = 1;
+    const double dx = b.first - a.first, dy = b.second - a.second;
+    const double p[4] = {-dx, dx, -dy, dy};
+    const double q[4] = {a.first - box.west, box.east - a.first, a.second - box.south, box.north - a.second};
+    for (int i = 0; i < 4; i++) {
+        if (p[i] == 0) {
+            if (q[i] < 0) return false;
+        } else {
+            const double t = q[i] / p[i];
+            if (p[i] < 0) { if (t > t1) return false; t0 = std::max(t0, t); }
+            else { if (t < t0) return false; t1 = std::min(t1, t); }
+        }
+    }
+    const Point from{a.first + t0 * dx, a.second + t0 * dy}, to{a.first + t1 * dx, a.second + t1 * dy};
+    a = from;
+    b = to;
+    return true;
+}
+
+// One GeoJSON line -> the pieces of it inside the level's area, each simplified, in map units.
+std::vector<std::vector<int32_t>> convert_line(const Json& line, const Level& level) {
+    std::vector<Point> points;
+    for (const Json& p : line) points.push_back({p[0].get<double>(), p[1].get<double>()});
+    std::vector<std::vector<Point>> pieces;
+    if (whole_world(level.coverage)) {
+        pieces.push_back(points);
+    } else {
+        std::vector<Point> current;
+        for (size_t i = 0; i + 1 < points.size(); i++) {
+            Point a = points[i], b = points[i + 1];
+            if (!clip_segment(a, b, level.coverage)) {
+                if (current.size() > 1) pieces.push_back(current);
+                current.clear();
+                continue;
+            }
+            if (current.empty() || current.back() != a) {         // a new piece when the line left the area
+                if (current.size() > 1) pieces.push_back(current);
+                current.assign(1, a);
+            }
+            current.push_back(b);
+        }
+        if (current.size() > 1) pieces.push_back(current);
+    }
+    std::vector<std::vector<int32_t>> out;
+    for (const std::vector<Point>& piece : pieces) {
+        std::vector<int32_t> units;
+        for (const Point& p : piece) {
+            units.push_back((int32_t)std::lround(p.first * vtw::MAP_UNITS_PER_DEGREE));
+            units.push_back((int32_t)std::lround(p.second * vtw::MAP_UNITS_PER_DEGREE));
+        }
+        units = vtw::simplify_line(units, level.tolerance);
+        if (units.size() >= 4) out.push_back(std::move(units));
+    }
+    return out;
+}
+
+void add_line(const Json& coordinates, const Level& level, vtw::MapLayer& layer) {
+    for (std::vector<int32_t>& units : convert_line(coordinates, level)) {
+        vtw::MapLine line;
+        int32_t west = units[0], east = units[0], south = units[1], north = units[1];
+        for (size_t i = 0; i < units.size(); i += 2) {
+            west = std::min(west, units[i]); east = std::max(east, units[i]);
+            south = std::min(south, units[i + 1]); north = std::max(north, units[i + 1]);
+        }
+        line.box = {south / vtw::MAP_UNITS_PER_DEGREE, west / vtw::MAP_UNITS_PER_DEGREE,
+                    north / vtw::MAP_UNITS_PER_DEGREE, east / vtw::MAP_UNITS_PER_DEGREE};
+        line.points = std::move(units);
+        layer.lines.push_back(std::move(line));
+    }
+}
+
 void add_polygon(const Json& rings, const Level& level, vtw::MapLayer& layer) {
     vtw::MapPolygon polygon;
     for (size_t i = 0; i < rings.size(); i++) {
@@ -117,8 +191,8 @@ void add_polygon(const Json& rings, const Level& level, vtw::MapLayer& layer) {
 }
 
 bool read_layer(const std::string& folder, const Level& level, const char* what, vtw::LayerKind kind,
-                vtw::BaseMap& map) {
-    const std::string path = folder + "/ne_" + level.name + "_" + what + ".geojson";
+                vtw::BaseMap& map, const char* file_part = nullptr) {
+    const std::string path = folder + "/ne_" + level.name + "_" + (file_part ? file_part : what) + ".geojson";
     std::ifstream file(path);
     if (!file) { std::fprintf(stderr, "cannot open %s (run tools/get_natural_earth.sh)\n", path.c_str()); return false; }
     const Json json = Json::parse(file, nullptr, false);
@@ -135,11 +209,15 @@ bool read_layer(const std::string& folder, const Level& level, const char* what,
         if (type == "Polygon") add_polygon(geometry["coordinates"], level, layer);
         else if (type == "MultiPolygon")
             for (const Json& polygon : geometry["coordinates"]) add_polygon(polygon, level, layer);
+        else if (type == "LineString") add_line(geometry["coordinates"], level, layer);
+        else if (type == "MultiLineString")
+            for (const Json& line : geometry["coordinates"]) add_line(line, level, layer);
     }
     size_t points = 0;
     for (const vtw::MapPolygon& p : layer.polygons)
         for (const std::vector<int32_t>& r : p.rings) points += r.size() / 2;
-    std::printf("%-5s %-5s %6zu polygons %8zu points\n", level.name, what, layer.polygons.size(), points);
+    for (const vtw::MapLine& l : layer.lines) points += l.points.size() / 2;
+    std::printf("%-5s %-8s %6zu shapes %8zu points\n", level.name, what, layer.polygons.size() + layer.lines.size(), points);
     map.layers.push_back(std::move(layer));
     return true;
 }
@@ -155,6 +233,9 @@ int main(int argc, char** argv) {
     for (const Level& level : LEVELS) {
         if (!read_layer(argv[1], level, "land", vtw::LayerKind::Land, map)) return 1;
         if (!read_layer(argv[1], level, "lakes", vtw::LayerKind::Lake, map)) return 1;
+        if (!read_layer(argv[1], level, "countries", vtw::LayerKind::Country, map, "admin_0_boundary_lines_land")) return 1;
+        if (!read_layer(argv[1], level, "states", vtw::LayerKind::State, map, "admin_1_states_provinces_lines")) return 1;
+        if (!read_layer(argv[1], level, "rivers", vtw::LayerKind::River, map, "rivers_lake_centerlines")) return 1;
     }
     std::string error;
     if (!vtw::save_basemap(argv[2], map, error)) { std::fprintf(stderr, "%s\n", error.c_str()); return 1; }
