@@ -1,0 +1,5 @@
+# build output
+build/
+
+# your own settings (a place name and coordinates): never committed, see settings.sample.json
+settings.json

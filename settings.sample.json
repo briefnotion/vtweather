@@ -1,0 +1,5 @@
+{
+    "location": { "name": "Wichita, Kansas (sample)", "lat": 37.69, "lon": -97.34 },
+    "zoom_km": 80,
+    "refresh_minutes": 5
+}
