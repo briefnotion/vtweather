@@ -2,8 +2,10 @@
 // clock for the schedule and a server on this machine serving the real NOAA test pictures.
 // Nothing goes to the internet.
 #include <chrono>
+#include <filesystem>
 #include <string>
 #include <thread>
+#include <unistd.h>
 
 #include "check.h"
 #include "test_server.h"
@@ -159,10 +161,80 @@ void tests() {
     }
 }
 
+// pictures kept between runs
+void store_tests() {
+    namespace fs = std::filesystem;
+    const std::string folder = (fs::temp_directory_path() / ("vtw_feed_store_" + std::to_string(getpid()))).string();
+    fs::remove_all(folder);
+    const vtw::View view = make_view();
+    TestServer server(VTW_TEST_DATA_DIR);
+    auto url = [&](const vtw::GeoBox&) { return server.url("/png/noaa_seattle_rain"); };
+    const double start = 1800000000;                                       // a made-up clock time for the first run
+
+    {   // the first run downloads a picture, and keeps it on disk
+        vtw::RadarStore store(folder);
+        vtw::RadarFeed feed(quick_settings(), 300, url, &store, start);
+        double t = 0;
+        CHECK(wait_for_status(feed, view, t, "just fetched"));
+        CHECK(server.requests() == 1);
+    }
+    CHECK(fs::exists(folder + "/radar_0.bin") || fs::exists(folder + "/radar_1.bin") || fs::exists(folder + "/radar_2.bin") || fs::exists(folder + "/radar_3.bin"));
+
+    {   // a run a little over two minutes later shows it at once and, while it is fresh, asks for nothing
+        vtw::RadarStore store(folder);
+        vtw::RadarFeed feed(quick_settings(), 300, url, &store, start + 130);
+        double t = 0;
+        feed.update(view, t);
+        CHECK(feed.has_frame());
+        CHECK(has(feed.status(t), "2 min ago"));
+        CHECK(feed.frame().width == 270);
+        for (t = 1; t < 160; t += 1) feed.update(view, t);                 // up to 4.8 minutes old
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        CHECK(server.requests() == 1);
+    }
+    {   // a picture that has gone stale is shown at once and a new one is asked for
+        vtw::RadarStore store(folder);
+        vtw::RadarFeed feed(quick_settings(), 300, url, &store, start + 400);
+        double t = 0;
+        feed.update(view, t);
+        CHECK(feed.has_frame() && has(feed.status(t), "(old)"));
+        CHECK(wait_for_requests(feed, view, t, server, 2));
+        CHECK(has(feed.status(t), "just fetched"));
+    }
+    {   // offline: the saved picture is shown, however old, and nothing is ever asked for
+        vtw::RadarStore store(folder);
+        vtw::RadarFeed feed(quick_settings(), 300, url, &store, start + 5000);
+        feed.set_offline(true);
+        double t = 0;
+        for (int i = 0; i < 50; i++) { feed.update(view, t); t += 1; }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        CHECK(feed.has_frame());
+        CHECK(has(feed.status(t), "--offline") && has(feed.status(t), "saved picture"));
+        CHECK(server.requests() == 2);
+    }
+    {   // offline with nothing saved: it says so
+        vtw::RadarStore empty((fs::path(folder) / "nothing_here").string());
+        vtw::RadarFeed feed(quick_settings(), 300, url, &empty, start);
+        feed.set_offline(true);
+        feed.update(view, 0);
+        CHECK(!feed.has_frame() && has(feed.status(0), "no saved picture"));
+    }
+    {   // a picture older than the limit is not loaded: it is asked for again
+        vtw::RadarStore store(folder);
+        vtw::RadarFeed feed(quick_settings(), 300, url, &store, start + vtw::STORED_MAX_AGE_SECONDS + 100000);
+        double t = 0;
+        feed.update(view, t);
+        CHECK(!feed.has_frame());
+        CHECK(wait_for_requests(feed, view, t, server, 3));
+    }
+    fs::remove_all(folder);
+}
+
 }  // namespace
 
 int main() {
     tests();
+    store_tests();
     if (failures == 0) std::printf("all radar feed tests passed\n");
     else std::printf("%d check(s) failed\n", failures);
     return failures;

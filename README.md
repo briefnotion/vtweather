@@ -20,8 +20,8 @@ clone with `--recursive`:
     cd vtweather
     cmake -B build
     cmake --build build
-    ./build/vtweather             (q quits; also --settings FILE, --offline, --no-color, --fps N,
-                                   --cols N --rows N)
+    ./build/vtweather             (q quits; also --settings FILE, --offline, --no-cache, --no-color,
+                                   --fps N, --cols N --rows N)
 
 If `vtscreen/` or `third_party/json/` is empty, run `git submodule update --init`.
 
@@ -40,6 +40,8 @@ it: the notes on screen say what was wrong and what was used instead.
 | `cell_aspect` | how many times taller than wide a terminal cell is, 1 to 3 (2.0 suits most) |
 | `refresh_minutes` | how often to ask for new radar, never less than 5: the radar updates about that often and the data comes from a free service |
 | `user_agent_contact` | optional, how a data service can reach you; sent in the User-Agent |
+| `remember_view` | `true` (the default): start where you were looking last time; `r` still goes to `location` |
+| `cache_dir` | where pictures and the last view are kept; empty means the usual place (see below) |
 
 ## Being kind to the data services
 
@@ -88,6 +90,23 @@ Moving or zooming out onto an area the radar picture does not cover makes the pr
 one, but only after you have stayed there for a second, so holding a key does not send a request
 for every press. Zooming in never needs a new picture: the radar's own detail is about 1 km.
 `--offline` asks the radar service for nothing at all, which is handy for trying the keys.
+
+## Kept between runs
+
+The program keeps two things on disk, in a folder of its own, `~/.cache/vtweather` (or
+`$XDG_CACHE_HOME/vtweather`; the `cache_dir` setting names another), never in the repository:
+
+- the last 4 radar pictures, so a restart shows rain at once (and, if a picture is older than the
+  refresh time, it is shown marked "(old)" while a new one is asked for), and with no network, or
+  with `--offline`, the last saved picture is still there with its age. Pictures older than 6 hours
+  are not loaded;
+- where you were looking: the centre, the zoom, and whether the grid and the names were on. It is
+  saved every 30 seconds and when you quit, and loaded when you start (unless `remember_view` is
+  `false`). `r` goes back to the place in your settings.
+
+Both files tell a little about where you live, which is why they are kept out of the repository.
+`--no-cache` turns all of this off for one run: nothing is read or written. A missing or damaged
+file is never an error; the program just starts without it.
 
 ## The base map
 
@@ -166,7 +185,7 @@ picture of heavy rain.
 They cover the View (scale, cell shape, north up, rotation, round trips, pan, zoom), the settings
 loader (good, missing, damaged, wrong type, out of range), the request policy (with a made-up
 clock), the fetcher (pacing, backoff, the hourly limit, timeouts, size limit, cancelling), the
-PNG reader, the colour scale, the worker thread, the keys and the base map (its file format, the
+PNG reader, the colour scale, the worker thread, the picture cache, what is kept on disk, the keys and the base map (its file format, the
 ring simplifier, filling land and water into cells, and known places on the real file). The fetch tests talk to a small server on your own machine; nothing goes to the
 internet.
 

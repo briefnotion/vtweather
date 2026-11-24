@@ -22,6 +22,8 @@ struct Settings {
     double cell_aspect = 2.0;         // how many times taller than wide a terminal cell is
     int refresh_minutes = MIN_REFRESH_MINUTES;
     std::string contact;              // for the User-Agent, optional
+    bool remember_view = true;        // start where you were looking last time (r still goes home)
+    std::string cache_dir;            // where radar pictures and the last view are kept; "" = the usual place
     std::string source = "built-in defaults";   // the file the settings came from
 };
 

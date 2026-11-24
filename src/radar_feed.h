@@ -16,6 +16,7 @@
 #include "radar_scheduler.h"
 #include "radar_worker.h"
 #include "settings.h"
+#include "store.h"
 #include "view.h"
 
 namespace vtw {
@@ -30,8 +31,13 @@ FetchSettings radar_fetch_settings(const Settings& settings);     // who we are 
 
 class RadarFeed {
 public:
-    explicit RadarFeed(const Settings& settings);
-    RadarFeed(FetchSettings fetch, double refresh_seconds, UrlBuilder url_for);
+    // store, if there is one, holds pictures between runs: its pictures are loaded now and each new one
+    // is saved. unix_at_start is the clock time (seconds since 1970) of time 0 of update().
+    RadarFeed(const Settings& settings, RadarStore* store, double unix_at_start);
+    RadarFeed(FetchSettings fetch, double refresh_seconds, UrlBuilder url_for, RadarStore* store = nullptr,
+              double unix_at_start = 0);
+
+    void set_offline(bool offline) { offline_ = offline; }     // show what is held, ask for nothing
 
     void update(const View& view, double now);
 
@@ -50,6 +56,9 @@ private:
     std::shared_ptr<const CachedPicture> current_;      // the picture being shown
     RadarFrame none_;
     double retry_at_ = 0;
+    RadarStore* store_;
+    double unix_at_start_;
+    bool offline_ = false;
     std::string error_;
 };
 

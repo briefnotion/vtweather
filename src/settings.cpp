@@ -49,6 +49,8 @@ void read_settings(const Json& json, Settings& s, std::string& notes) {
     read_key(json, "cell_aspect", s.cell_aspect, notes);
     read_key(json, "refresh_minutes", s.refresh_minutes, notes);
     read_key(json, "user_agent_contact", s.contact, notes);
+    read_key(json, "remember_view", s.remember_view, notes);
+    read_key(json, "cache_dir", s.cache_dir, notes);
 
     keep_between(s.home.lat, -MAX_LATITUDE, MAX_LATITUDE, "lat", notes);
     keep_between(s.home.lon, -180.0, 180.0, "lon", notes);

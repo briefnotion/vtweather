@@ -3,5 +3,7 @@
     "zoom_km": 80,
     "cell_aspect": 2.0,
     "refresh_minutes": 5,
-    "user_agent_contact": ""
+    "user_agent_contact": "",
+    "remember_view": true,
+    "cache_dir": ""
 }

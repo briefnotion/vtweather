@@ -19,7 +19,7 @@ find_package(CURL REQUIRED)                 # fetching from the web (libcurl, an
 find_package(Threads REQUIRED)
 
 set(VTWEATHER_SOURCES src/settings.cpp src/view.cpp src/draw_grid.cpp src/request_policy.cpp src/fetch.cpp src/inflate.cpp src/png.cpp src/radar_frame.cpp src/radar_source.cpp src/radar_worker.cpp
-    src/radar_scheduler.cpp src/radar_cache.cpp src/radar_feed.cpp src/cell_grid.cpp src/draw_radar.cpp src/input.cpp src/basemap.cpp src/ground_map.cpp src/draw_ground.cpp
+    src/radar_scheduler.cpp src/radar_cache.cpp src/store.cpp src/radar_feed.cpp src/cell_grid.cpp src/draw_radar.cpp src/input.cpp src/basemap.cpp src/ground_map.cpp src/draw_ground.cpp
     src/place_labels.cpp src/draw_places.cpp)
 
 set(VTWEATHER_SOURCES_NO_MAIN ${VTWEATHER_SOURCES})
@@ -96,3 +96,9 @@ add_executable(vtweather_places_tests tests/places_tests.cpp src/place_labels.cp
 target_include_directories(vtweather_places_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_definitions(vtweather_places_tests PRIVATE VTW_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
 add_test(NAME vtweather_places_tests COMMAND vtweather_places_tests)
+
+# what is kept on disk: radar pictures and the remembered view
+add_executable(vtweather_store_tests tests/store_tests.cpp src/store.cpp)
+target_include_directories(vtweather_store_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(vtweather_store_tests PRIVATE nlohmann_json::nlohmann_json)
+add_test(NAME vtweather_store_tests COMMAND vtweather_store_tests)
