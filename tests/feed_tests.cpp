@@ -107,6 +107,26 @@ void tests() {
         t = 321.2;
         CHECK(wait_for_requests(feed, moved, t, server, 3));
         CHECK(!feed.failing());
+
+        // back to where you were a moment ago: the cached picture is used, nothing is downloaded
+        const double back_at = t + 20;
+        for (t = back_at; t < back_at + 10; t += 0.5) {
+            feed.update(view, t);
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        CHECK(server.requests() == 3);
+        CHECK(feed.has_frame() && !feed.failing());
+        CHECK(feed.cached_pictures() >= 2);
+        // and away and back again, still within the refresh time: still nothing
+        for (t = back_at + 10; t < back_at + 15; t += 0.5) feed.update(moved, t);
+        for (t = back_at + 15; t < back_at + 25; t += 0.5) feed.update(view, t);
+        CHECK(server.requests() == 3);
+
+        // once the cached picture is stale, it is still shown while a new one is asked for
+        t = 301 + 400;
+        feed.update(view, t);
+        CHECK(feed.has_frame());
+        CHECK(wait_for_requests(feed, view, t, server, 4));
     }
     // a service that fails: the feed says so, keeps asking only now and then, and is told
     // to leave the service alone while it backs off

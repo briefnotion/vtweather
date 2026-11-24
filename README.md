@@ -54,9 +54,13 @@ rules it follows are in `src/request_policy.cpp`:
   4 minutes and so on up to 30 minutes, and longer if the server sends `Retry-After`; a success
   starts over, and while it waits nothing goes out at all;
 - never more than 120 requests an hour, as a safety net against a bug that loops;
-- the program itself asks for a picture only at start, then every `refresh_minutes` (never under 5),
-  and when the view has moved off the picture and stayed there for a second; never twice within 5
-  seconds, and after a failure it waits at least 10 seconds, or as long as the service asked;
+- the program itself asks for a picture only at start, then when the picture in use is older than
+  `refresh_minutes` (never under 5), and when the view has moved off every picture it holds and
+  stayed there for a second; never twice within 5 seconds, and after a failure it waits at least 10
+  seconds, or as long as the service asked;
+- it keeps the last 8 pictures in memory, so going back to a place you looked at a moment ago, or
+  zooming out and in again, downloads nothing: the newest picture that covers the view is used (a
+  new picture replaces older ones it covers, so nothing is kept twice);
 - only https, a 10 second connect and 30 second total time limit, an 8 MB size limit, and a
   request can be cancelled at once when the program quits.
 

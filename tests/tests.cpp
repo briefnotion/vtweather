@@ -9,6 +9,7 @@
 #include "check.h"
 
 #include "../src/input.h"
+#include "../src/radar_cache.h"
 #include "../src/radar_scheduler.h"
 #include "../src/request_policy.h"
 #include "../src/settings.h"
@@ -294,67 +295,127 @@ void policy_tests() {
 // When to ask for a new radar picture, with a made-up clock (seconds)
 void scheduler_tests() {
     using vtw::RadarScheduler;
-    // the first picture is asked for at once, and not again until it is time
+    // the first picture is asked for at once; while it is fresh and covers the view, nothing more
     {
-        RadarScheduler s(300);
-        CHECK(s.due(0, false, false));
+        RadarScheduler s;
+        CHECK(s.due(0, false, false, false));
         s.requested(0);
         s.finished(1, true, 0);
-        CHECK(!s.due(2, true, true));                              // covered, not yet time
-        CHECK(!s.due(299, true, true));
-        CHECK(s.due(300, true, true));                             // the refresh time
+        CHECK(!s.due(2, true, true, false));
+        CHECK(!s.due(299, true, true, false));
+        CHECK(s.due(300, true, true, true));                       // stale: time for a new one
         s.requested(300);
-        CHECK(!s.due(301, true, true));
+        CHECK(!s.due(301, true, true, true));                      // but not within the spacing
     }
     // moving somewhere the picture does not cover: only after staying there a moment
     {
-        RadarScheduler s(300);
+        RadarScheduler s;
         s.requested(0);
         s.finished(1, true, 0);
-        CHECK(!s.due(50, true, false));                            // just moved: starts the wait
-        CHECK(!s.due(50.5, true, false));
-        CHECK(s.due(51.1, true, false));                           // stayed a second: ask
+        CHECK(!s.due(50, true, false, false));                     // just moved: starts the wait
+        CHECK(!s.due(50.5, true, false, false));
+        CHECK(s.due(51.1, true, false, false));                    // stayed a second: ask
         s.requested(51.1);
-        CHECK(!s.due(52, true, false));                            // never twice within the spacing
-        CHECK(!s.due(56, true, false));                            // still within the spacing
-        CHECK(!s.due(57.2, true, false));                          // spacing over: the moment's wait starts again
-        CHECK(s.due(58.3, true, false));
+        CHECK(!s.due(52, true, false, false));                     // never twice within the spacing
+        CHECK(!s.due(56, true, false, false));                     // still within the spacing
+        CHECK(!s.due(57.2, true, false, false));                   // spacing over: the moment's wait starts again
+        CHECK(s.due(58.3, true, false, false));
     }
     // moving about (never staying) asks for nothing; coming back resets the wait
     {
-        RadarScheduler s(300);
+        RadarScheduler s;
         s.requested(0);
         s.finished(1, true, 0);
         for (double t = 10; t < 30; t += 0.4) {
             const bool covered = ((int)(t * 10) / 4) % 2 == 0;     // in and out every 0.4 s
-            CHECK(!s.due(t, true, covered));
+            CHECK(!s.due(t, true, covered, false));
         }
-        CHECK(!s.due(40, true, false));
-        CHECK(!s.due(40.9, true, false));
-        CHECK(!s.due(40.95, true, true));                          // back in view: the wait is forgotten
-        CHECK(!s.due(41.5, true, false));
+        CHECK(!s.due(40, true, false, false));
+        CHECK(!s.due(40.9, true, false, false));
+        CHECK(!s.due(40.95, true, true, false));                   // back in view: the wait is forgotten
+        CHECK(!s.due(41.5, true, false, false));
     }
     // after a failure: wait at least 10 s, or as long as the service asked, then try again
     {
-        RadarScheduler s(300);
-        CHECK(s.due(0, false, false));
+        RadarScheduler s;
+        CHECK(s.due(0, false, false, false));
         s.requested(0);
         s.finished(2, false, 0);
-        CHECK(!s.due(5, false, false));
-        CHECK(!s.due(11.9, false, false));
-        CHECK(s.due(12.1, false, false));
+        CHECK(!s.due(5, false, false, false));
+        CHECK(!s.due(11.9, false, false, false));
+        CHECK(s.due(12.1, false, false, false));
         s.requested(12.1);
         s.finished(14, false, 120);                                // the service says: not for 2 minutes
-        CHECK(!s.due(100, false, false));
-        CHECK(s.due(134.5, false, false));
-        // with a picture in hand a failed refresh is also tried again after the wait
+        CHECK(!s.due(100, false, false, false));
+        CHECK(s.due(134.5, false, false, false));
+        // with a stale picture in hand a failed refresh is also tried again after the wait
         s.requested(134.5);
         s.finished(135, true, 0);
         s.requested(500);
         s.finished(501, false, 0);
-        CHECK(!s.due(505, true, true));
-        CHECK(s.due(511.5, true, true));
+        CHECK(!s.due(505, true, true, true));
+        CHECK(s.due(511.5, true, true, true));
     }
+    // a stale picture that covers the view is refreshed at once (no waiting for a moment)
+    {
+        RadarScheduler s;
+        s.requested(0);
+        s.finished(1, true, 0);
+        CHECK(s.due(400, true, true, true));
+    }
+}
+
+// The cache of recent radar pictures
+void cache_tests() {
+    using vtw::GeoBox;
+    using vtw::RadarCache;
+    using vtw::RadarFrame;
+    auto frame_of = [](double s, double w, double n, double e, uint8_t mark) {
+        RadarFrame f;
+        f.box = {s, w, n, e};
+        f.width = 2; f.height = 1;
+        f.dbz = {mark, mark};
+        return f;
+    };
+    RadarCache cache(3);
+    CHECK(!cache.best_for({0, 0, 1, 1}, 0));
+    // the newest picture that covers an area is the one given
+    cache.add(frame_of(40, -100, 42, -98, 1), 10, 10);
+    cache.add(frame_of(30, -110, 50, -90, 2), 20, 20);               // a bigger area, newer
+    auto got = cache.best_for({40.5, -99.5, 41.5, -98.5}, 30);
+    CHECK(got && got->frame.dbz[0] == 2);                             // both cover it: the newer
+    CHECK(cache.size() == 2 || cache.size() == 1);
+    CHECK(!cache.best_for({20, -99.5, 21, -98.5}, 30));               // nowhere near
+    // a new picture replaces older ones it covers (nothing is kept twice)
+    RadarCache c2(5);
+    c2.add(frame_of(40, -100, 41, -99, 1), 1, 1);
+    c2.add(frame_of(41, -100, 42, -99, 2), 2, 2);
+    c2.add(frame_of(39, -101, 43, -98, 3), 3, 3);                     // covers both
+    CHECK(c2.size() == 1 && c2.all()[0]->frame.dbz[0] == 3);
+    // but an older picture of a bigger area stays when the new one is smaller
+    c2.add(frame_of(40, -100, 41, -99, 4), 4, 4);
+    CHECK(c2.size() == 2);
+    // an older picture does not replace a newer one of the same area, and the newer wins a lookup
+    RadarCache c3(5);
+    c3.add(frame_of(40, -100, 41, -99, 5), 100, 100);
+    c3.add(frame_of(40, -100, 41, -99, 6), 50, 101);                  // fetched earlier than the one in hand
+    CHECK(c3.best_for({40.2, -99.8, 40.8, -99.2}, 102)->frame.dbz[0] == 5);
+    // at the limit the one used longest ago goes, never the newest
+    RadarCache c4(3);
+    c4.add(frame_of(0, 0, 1, 1, 1), 1, 1);
+    c4.add(frame_of(10, 10, 11, 11, 2), 2, 2);
+    c4.add(frame_of(20, 20, 21, 21, 3), 3, 3);
+    CHECK(c4.best_for({0.2, 0.2, 0.8, 0.8}, 10));                      // the first is used again
+    c4.add(frame_of(30, 30, 31, 31, 4), 4, 11);
+    CHECK(c4.size() == 3);
+    CHECK(c4.best_for({0.2, 0.2, 0.8, 0.8}, 12));                      // still there
+    CHECK(!c4.best_for({10.2, 10.2, 10.8, 10.8}, 12));                 // the one used longest ago went
+    CHECK(c4.best_for({30.2, 30.2, 30.8, 30.8}, 12));                  // and the new one is kept
+    // a picture in use stays alive after it leaves the cache
+    RadarCache c5(1);
+    auto kept = c5.add(frame_of(0, 0, 1, 1, 9), 1, 1);
+    c5.add(frame_of(5, 5, 6, 6, 8), 2, 2);
+    CHECK(c5.size() == 1 && kept->frame.dbz[0] == 9);
 }
 
 // What the keys do
@@ -450,6 +511,7 @@ int main() {
     settings_tests();
     policy_tests();
     scheduler_tests();
+    cache_tests();
     input_tests();
     if (failures == 0) std::printf("all tests passed\n");
     else std::printf("%d check(s) failed\n", failures);

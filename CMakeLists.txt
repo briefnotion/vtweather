@@ -19,7 +19,7 @@ find_package(CURL REQUIRED)                 # fetching from the web (libcurl, an
 find_package(Threads REQUIRED)
 
 set(VTWEATHER_SOURCES src/settings.cpp src/view.cpp src/draw_grid.cpp src/request_policy.cpp src/fetch.cpp src/inflate.cpp src/png.cpp src/radar_frame.cpp src/radar_source.cpp src/radar_worker.cpp
-    src/radar_scheduler.cpp src/radar_feed.cpp src/cell_grid.cpp src/draw_radar.cpp src/input.cpp src/basemap.cpp src/ground_map.cpp src/draw_ground.cpp
+    src/radar_scheduler.cpp src/radar_cache.cpp src/radar_feed.cpp src/cell_grid.cpp src/draw_radar.cpp src/input.cpp src/basemap.cpp src/ground_map.cpp src/draw_ground.cpp
     src/place_labels.cpp src/draw_places.cpp)
 
 set(VTWEATHER_SOURCES_NO_MAIN ${VTWEATHER_SOURCES})
@@ -35,7 +35,7 @@ endif()
 
 # tests: cmake --build build && ctest --test-dir build --output-on-failure
 enable_testing()
-add_executable(vtweather_tests tests/tests.cpp src/settings.cpp src/view.cpp src/request_policy.cpp src/radar_scheduler.cpp src/input.cpp)
+add_executable(vtweather_tests tests/tests.cpp src/settings.cpp src/view.cpp src/request_policy.cpp src/radar_scheduler.cpp src/radar_cache.cpp src/radar_frame.cpp src/png.cpp src/inflate.cpp src/input.cpp)
 target_include_directories(vtweather_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(vtweather_tests PRIVATE nlohmann_json::nlohmann_json)
 add_test(NAME vtweather_tests COMMAND vtweather_tests)
