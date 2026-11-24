@@ -33,4 +33,5 @@ place. `settings.json` is in `.gitignore`, so your location is never committed.
 
 ## Licence
 
-MIT, see `LICENSE`.
+GNU General Public License v3.0, see `LICENSE`. The libraries it uses, vtscreen and nlohmann/json,
+are MIT-licensed and keep their own licences in their folders.
