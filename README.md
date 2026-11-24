@@ -5,8 +5,8 @@ letters in a terminal. Built on [vtscreen](https://github.com/briefnotion/vtscre
 
 **Status:** just started. It reads its settings, has the View that turns places on the earth
 into places on the screen (zoom, pan, cell shape, ready for a rotated map), has a polite web
-fetcher (not used by the screen yet), and shows a graticule with a marker as a stand-in for the
-map. Planned, in this order: a PNG reader, one radar frame at a fixed place, zoom and pan keys,
+fetcher and a PNG reader (neither used by the screen yet), and shows a graticule with a marker as a stand-in for the
+map. Planned, in this order: one radar frame at a fixed place, zoom and pan keys,
 a base map, an animated loop of the last hour or two, alerts.
 
 ## Build and run
@@ -55,6 +55,14 @@ rules it follows are in `src/request_policy.cpp`:
 - only https, a 10 second connect and 30 second total time limit, an 8 MB size limit, and a
   request can be cancelled at once when the program quits.
 
+## The PNG reader
+
+The radar comes as PNG pictures, and there is no PNG reader in C++, so this project has its own
+(`src/png.cpp` and `src/inflate.cpp`, no libraries). It reads every kind of PNG except interlaced
+ones, checks everything (the signature, every chunk's checksum, sizes, the compressed data's
+checksum) and refuses anything odd with a reason, since the pictures come off the network. A
+1500 x 1000 picture takes about 40 milliseconds.
+
 ## Tests
 
     cmake --build build
@@ -62,8 +70,16 @@ rules it follows are in `src/request_policy.cpp`:
 
 They cover the View (scale, cell shape, north up, rotation, round trips, pan, zoom), the settings
 loader (good, missing, damaged, wrong type, out of range), the request policy (with a made-up
-clock) and the fetcher (pacing, backoff, the hourly limit, timeouts, size limit, cancelling). The
-fetch tests talk to a small server on your own machine; nothing goes to the internet.
+clock), the fetcher (pacing, backoff, the hourly limit, timeouts, size limit, cancelling) and the
+PNG reader. The fetch tests talk to a small server on your own machine; nothing goes to the
+internet.
+
+`tests/data/` holds the PNG test pictures, made by `tests/make_png_fixtures.py` (it needs Pillow,
+which also checks the expected pixels, and it is only needed to remake them). Most are synthetic:
+every colour type and bit depth, with transparency, every row filter and several compression
+styles. Two are real answers from NOAA's radar map service (US government data, public domain).
+The test also feeds the reader thousands of shortened and randomly damaged files; running it
+under ASan and UBSan is a good idea after any change to the reader.
 
 ## Third-party code
 
