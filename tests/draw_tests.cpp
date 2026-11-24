@@ -161,23 +161,23 @@ vtw::MapLine ground_line(double lon0, double lat0, double lon1, double lat1) {
     return l;
 }
 
-// the layers a cell has, worked out here from its features, as an independent check of the drawing
+// the layers a cell has, worked out here from its features, as an independent check of the drawing: how many,
+// and the look of the top one (borders, then the coast, then roads, then rivers)
 struct Expected { int layers = 0; double lum = 0; double rgb[3] = {0, 0, 0}; };
-
-void expect_layer(Expected& e, double lum, int r, int g, int b) {
-    if (e.layers == 0) { e.lum = lum; e.rgb[0] = r; e.rgb[1] = g; e.rgb[2] = b; }
-    else { e.lum = std::max(e.lum, lum); e.rgb[0] += r; e.rgb[1] += g; e.rgb[2] += b; }
-    e.layers++;
-    for (double& c : e.rgb) c = std::min(255.0, c);
-}
 
 Expected expected_for(vtw::Ground kind, uint8_t f) {
     Expected e;
-    if (kind == vtw::Ground::Coast) expect_layer(e, 0.33, 190, 170, 120);
-    if (f & vtw::FEATURE_COUNTRY) expect_layer(e, 0.26, 215, 120, 150);
-    else if (f & vtw::FEATURE_STATE) expect_layer(e, 0.20, 150, 120, 175);
-    if (f & vtw::FEATURE_HIGHWAY) expect_layer(e, 0.23, 230, 180, 85);
-    if (f & vtw::FEATURE_RIVER) expect_layer(e, 0.15, 70, 140, 205);
+    auto layer = [&](bool present, double lum, int r, int g, int b) {
+        if (!present) return;
+        if (e.layers == 0) { e.lum = lum; e.rgb[0] = r; e.rgb[1] = g; e.rgb[2] = b; }   // asked in order of priority: the first is the top
+        e.layers++;
+    };
+    layer(f & vtw::FEATURE_COUNTRY, 0.26, 215, 120, 150);
+    layer(!(f & vtw::FEATURE_COUNTRY) && (f & vtw::FEATURE_STATE), 0.20, 150, 120, 175);
+    layer(kind == vtw::Ground::Coast, 0.33, 190, 170, 120);
+    layer(f & vtw::FEATURE_HIGHWAY, 0.23, 230, 180, 85);
+    layer(f & vtw::FEATURE_RIVER, 0.15, 70, 140, 205);
+    // a country border and a state border are one layer: the loop above counted a state border only when there was no country border
     return e;
 }
 
@@ -237,8 +237,8 @@ void ground_tests() {
                 CHECK(c.lum == 0 && c.alt_lum == 0 && c.r == 0 && c.g == 0 && c.b == 0 && c.shimmer == 1 && !c.text);
                 continue;
             }
-            // a line, or several: letters only, no colour behind them; the brightest of them, their colours added,
-            // and a shimmer of none for one layer, the base for two, twice it for three, three times it for four
+            // a line, or several: letters only, no colour behind them; the look of the top one, not mixed, and a
+            // shimmer of none for one layer, the base for two, twice it for three, three times it for four
             CHECK(c.alt_lum == 0);
             CHECK_NEAR(c.lum, e.lum, 1e-12);
             CHECK_NEAR(c.r, e.rgb[0], 1e-9);
@@ -321,7 +321,7 @@ void blend_tests() {
     CHECK(vtw::overlap_shimmer(0) == 0 && vtw::overlap_shimmer(1) == 0);
     CHECK_NEAR(vtw::overlap_shimmer(2), vtw::OVERLAP_SHIMMER, 1e-12);
     CHECK_NEAR(vtw::overlap_shimmer(4), 3 * vtw::OVERLAP_SHIMMER, 1e-12);
-    CHECK(vtw::OVERLAP_SHIMMER > 0 && vtw::OVERLAP_SHIMMER < 1);
+    CHECK(vtw::OVERLAP_SHIMMER >= 0.75 && vtw::OVERLAP_SHIMMER <= 1.0);          // three to four times the first 0.25
 
     vtscreen::Picture picture;
     picture.init(4, 6);
@@ -334,47 +334,60 @@ void blend_tests() {
     CHECK(blend.layers_at(1, 1) == 1);
     CHECK(water.lum == 0.2 && water.r == 100 && water.g == 50 && water.b == 25 && water.shimmer == 0);
     CHECK(water.alt_lum == 1 && water.alt_b == 48);
-    // a second layer: brighter of the two, colours added and capped, the base shimmer
+    // a second layer that is higher takes the look (the colours are not mixed); the shimmer is the base
     blend.add(1, 1, Layer::Rain, 0.6, 200, 10, 5);
     CHECK(blend.layers_at(1, 1) == 2);
-    CHECK(water.lum == 0.6 && water.r == 255 && water.g == 60 && water.b == 30);
+    CHECK(water.lum == 0.6 && water.r == 200 && water.g == 10 && water.b == 5);
     CHECK_NEAR(water.shimmer, vtw::OVERLAP_SHIMMER, 1e-12);
-    // a dimmer one does not lower the brightness; each more adds the base again
-    blend.add(1, 1, Layer::River, 0.1, 0, 0, 0);
-    CHECK(water.lum == 0.6 && blend.layers_at(1, 1) == 3 && std::fabs(water.shimmer - 2 * vtw::OVERLAP_SHIMMER) < 1e-12);
-    blend.add(1, 1, Layer::Grid, 0.1, 0, 0, 0);
-    CHECK(std::fabs(water.shimmer - 3 * vtw::OVERLAP_SHIMMER) < 1e-12);
+    // lower layers, however bright, leave the look alone; each one adds the base to the shimmer
+    blend.add(1, 1, Layer::River, 0.9, 1, 2, 3);
+    CHECK(water.lum == 0.6 && water.r == 200 && blend.layers_at(1, 1) == 3 && std::fabs(water.shimmer - 2 * vtw::OVERLAP_SHIMMER) < 1e-12);
+    blend.add(1, 1, Layer::Grid, 0.95, 4, 5, 6);
+    CHECK(water.lum == 0.6 && water.g == 10 && std::fabs(water.shimmer - 3 * vtw::OVERLAP_SHIMMER) < 1e-12);
     // the same layer again changes nothing
     blend.add(1, 1, Layer::Rain, 1.0, 255, 255, 255);
-    CHECK(blend.layers_at(1, 1) == 4 && water.lum == 0.6 && water.g == 60);
+    CHECK(blend.layers_at(1, 1) == 4 && water.lum == 0.6 && water.g == 10);
     // other cells are not touched
     CHECK(blend.layers_at(1, 2) == 0 && picture.at(1, 2).lum == 0 && picture.at(1, 2).shimmer == 1);
 
-    // the order the layers are added in makes no difference
+    // the priority: rain over the grid over borders over the coast over roads over rivers; whichever order
+    // two layers are added in, the higher one decides the look
+    const Layer by_priority[6] = {Layer::River, Layer::Road, Layer::Coast, Layer::Border, Layer::Grid, Layer::Rain};
+    for (int low = 0; low < 6; low++)
+        for (int high = low + 1; high < 6; high++)
+            for (int order = 0; order < 2; order++) {
+                vtscreen::Picture p;
+                p.init(1, 1);
+                vtw::LayerBlend b(p);
+                const double lum_low = 0.9, lum_high = 0.1;                              // the higher layer is the dimmer
+                if (order == 0) { b.add(0, 0, by_priority[low], lum_low, 10, 20, 30); b.add(0, 0, by_priority[high], lum_high, 40, 50, 60); }
+                else { b.add(0, 0, by_priority[high], lum_high, 40, 50, 60); b.add(0, 0, by_priority[low], lum_low, 10, 20, 30); }
+                CHECK(p.at(0, 0).lum == lum_high && p.at(0, 0).r == 40 && p.at(0, 0).g == 50 && p.at(0, 0).b == 60);
+                CHECK_NEAR(p.at(0, 0).shimmer, vtw::OVERLAP_SHIMMER, 1e-12);
+            }
+
+    // every order of four layers gives the same cell: the rain's look, three times the base
     const Layer all[4] = {Layer::Grid, Layer::Border, Layer::Coast, Layer::Rain};
     const double lum[4] = {0.18, 0.26, 0.33, 0.55};
     const int red[4] = {90, 215, 190, 120}, green[4] = {135, 120, 170, 200}, blue[4] = {175, 150, 120, 60};
     std::vector<int> order = {0, 1, 2, 3};
-    vtscreen::PicCell first;
-    bool have_first = false;
     do {
         vtscreen::Picture p;
         p.init(1, 1);
         vtw::LayerBlend b(p);
         for (int i : order) b.add(0, 0, all[i], lum[i], red[i], green[i], blue[i]);
         const vtscreen::PicCell& c = p.at(0, 0);
-        if (!have_first) { first = c; have_first = true; }
-        CHECK(c.lum == first.lum && c.r == first.r && c.g == first.g && c.b == first.b && c.shimmer == first.shimmer);
+        CHECK(c.lum == 0.55 && c.r == 120 && c.g == 200 && c.b == 60);
+        CHECK_NEAR(c.shimmer, 3 * vtw::OVERLAP_SHIMMER, 1e-12);
     } while (std::next_permutation(order.begin(), order.end()));
-    CHECK(first.lum == 0.55 && first.r == 255 && first.g == 255 && first.b == 255);          // 90+215+190+120, capped; blue 505
-    CHECK_NEAR(first.shimmer, 3 * vtw::OVERLAP_SHIMMER, 1e-12);
 
-    // all six layers in one cell: five times the base
+    // all six layers in one cell: five times the base, and the rain's look
     vtscreen::Picture six;
     six.init(1, 1);
     vtw::LayerBlend six_blend(six);
-    for (int i = 0; i < vtw::LAYER_COUNT; i++) six_blend.add(0, 0, (Layer)i, 0.2, 10, 10, 10);
-    CHECK(six_blend.layers_at(0, 0) == 6 && std::fabs(six.at(0, 0).shimmer - 5 * vtw::OVERLAP_SHIMMER) < 1e-12 && six.at(0, 0).r == 60);
+    for (int i = 0; i < vtw::LAYER_COUNT; i++) six_blend.add(0, 0, (Layer)i, 0.2 + 0.1 * i, 10 + i, 10, 10);
+    CHECK(six_blend.layers_at(0, 0) == 6 && std::fabs(six.at(0, 0).shimmer - 5 * vtw::OVERLAP_SHIMMER) < 1e-12);
+    CHECK(six.at(0, 0).r == 15 && std::fabs(six.at(0, 0).lum - 0.7) < 1e-12);             // the sixth, Rain, is the top
 }
 
 }  // namespace

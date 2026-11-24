@@ -1,7 +1,5 @@
 #include "layers.h"
 
-#include <algorithm>
-
 namespace vtw {
 
 namespace {
@@ -26,14 +24,9 @@ void LayerBlend::add(int row, int col, Layer layer, double brightness, int r, in
     const uint8_t bit = (uint8_t)(1u << (int)layer);
     if (present & bit) return;
     vtscreen::PicCell& cell = picture_.at(row, col);
-    if (present == 0) {                                     // the first: takes the cell's letter (not its background)
+    if (bit > present) {                                    // the top layer so far (its bit is above all the others): its look
         cell.lum = brightness;
         cell.r = r; cell.g = g; cell.b = b;
-    } else {                                                // the next: the brighter, and the colours added
-        cell.lum = std::max(cell.lum, brightness);
-        cell.r = std::min(255.0, cell.r + r);
-        cell.g = std::min(255.0, cell.g + g);
-        cell.b = std::min(255.0, cell.b + b);
     }
     present |= bit;
     cell.shimmer = overlap_shimmer(count_bits(present));

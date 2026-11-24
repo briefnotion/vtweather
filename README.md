@@ -163,15 +163,14 @@ To remake the file (only needed if the map data changes):
 ## Where things overlap
 
 Rivers, roads, borders, the coast, the grid and the rain are layers. A cell with one of them holds its
-letter still. Where layers overlap, the cell shows it twice over: the colours are added together
-(each channel capped at 255, so an overlap is a new, paler colour), and the cell shimmers, by a base
-rate for each layer beyond the first: two layers shimmer at the base rate, three at twice it, four at
-three times it. The shimmer works without colour too, which is how an overlap shows there. The
-brightness is the brighter of the layers', so rain still reads as rain. The base is `OVERLAP_SHIMMER`
-in `src/layers.h` (0.25: a new letter about three times a second for two layers). The two kinds of
-border (state and country) count as one layer, and so do the two kinds of road; the land and the water
-are the ground the layers sit on and are not layers. The order the layers are drawn in makes no
-difference.
+letter still. Where layers overlap, the cell shimmers, by a base rate for each layer beyond the first:
+two layers shimmer at the base rate, three at twice it, four at three times it. The shimmer works
+without colour too, which is how an overlap shows there. How the cell looks (its brightness and
+colour) is the top layer's, not a mix, in this order of priority, highest first: rain, the grid,
+borders, the coast, roads, rivers. The base is `OVERLAP_SHIMMER` in `src/layers.h` (0.875: two layers
+change letter about ten times a second). The two kinds of border (state and country) count as one
+layer, and so do the two kinds of road; the land and the water are the ground the layers sit on and
+are not layers. The order the layers are drawn in makes no difference.
 
 ## Seeing the rain
 
