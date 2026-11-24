@@ -10,6 +10,42 @@ draws the rain as letters on top. You can zoom and move around with the keys. It
 being resized, and fetches the radar again every few minutes and when the view moves off the
 picture. Not yet: the animated loop of the last hour or two, alerts.
 
+## Quick start (Raspberry Pi OS, Debian, Ubuntu)
+
+Three steps, each a block you can paste into a terminal as it is.
+
+1. The tools it needs (once):
+
+        sudo apt install -y git g++ cmake libcurl4-openssl-dev
+
+2. Get the code. The extra options keep the download small by leaving out the history of
+   the JSON library it uses:
+
+        git clone --recursive --shallow-submodules --depth 1 https://github.com/briefnotion/vtweather.git
+
+3. Build it and run it (a few minutes on a Raspberry Pi; `-j4` uses all four cores and
+   `-DVTWEATHER_TESTS=OFF` skips the test programs, which you do not need to run it):
+
+        cd vtweather && cmake -B build -DVTWEATHER_TESTS=OFF && cmake --build build -j4 && ./build/vtweather
+
+It needs an internet connection for the radar. Without one it still draws the map.
+
+- **First run:** press `/` and type the name of your city, then Enter. The map and the
+  zoom you leave it on are remembered for next time. `+` and `-` zoom, `w a s d` or the
+  arrow keys move, `q` quits (all the keys are under "Keys" below).
+- **Run it again later:** `cd ~/vtweather && ./build/vtweather`
+- **Your home, and a contact for the data service:** `cp settings.sample.json settings.json`
+  and edit it (see "Settings"). `settings.json` is never committed.
+- **The plain Linux text console** (no desktop) has no colours: add `--no-color`. The
+  letters then tell the story on their own.
+- **A small screen or a slow Pi:** make the terminal window smaller, or add `--fps 15`.
+- **Update to the newest version:**
+
+        cd ~/vtweather && git pull && git submodule update --init && cmake --build build -j4
+
+- **Nothing happens, or it says a library is missing:** `git submodule update --init` fetches
+  the two libraries if the clone missed them, and the apt line above installs the rest.
+
 ## Build and run
 
 Linux, `g++` with C++17, `cmake` 3.16 or later, and the libcurl development files
@@ -24,6 +60,8 @@ clone with `--recursive`:
                                    --fps N, --cols N --rows N)
 
 If `vtscreen/` or `third_party/json/` is empty, run `git submodule update --init`.
+`-DVTWEATHER_TESTS=OFF` on the first `cmake` line leaves out the test programs and the map
+maker (see "Tests").
 
 ## Settings
 
@@ -236,6 +274,8 @@ it are placed by their hue. Known gap: the strongest end has not yet been compar
 picture of heavy rain.
 
 ## Tests
+
+The tests are built by default. Configure with `-DVTWEATHER_TESTS=OFF` to leave them out.
 
     cmake --build build
     ctest --test-dir build --output-on-failure
