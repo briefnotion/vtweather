@@ -485,6 +485,26 @@ void input_tests() {
     vtw::apply_command(Command::ToggleGraticule, view, settings, ui);
     CHECK(!ui.graticule);
 
+    // arrow keys move like w a s d; / and l open the go-to prompt
+    {
+        vtw::Key up, down, left, right, slash;
+        up.kind = vtw::KeyKind::Up; down.kind = vtw::KeyKind::Down; left.kind = vtw::KeyKind::Left; right.kind = vtw::KeyKind::Right;
+        slash.kind = vtw::KeyKind::Char; slash.ch = '/';
+        CHECK(vtw::command_for_event(up) == Command::PanUp && vtw::command_for_event(down) == Command::PanDown);
+        CHECK(vtw::command_for_event(left) == Command::PanLeft && vtw::command_for_event(right) == Command::PanRight);
+        CHECK(vtw::command_for_event(slash) == Command::OpenGoto);
+        vtw::Key w;
+        w.kind = vtw::KeyKind::Char; w.ch = 'w';
+        CHECK(vtw::command_for_event(w) == Command::PanUp);
+        vtw::Key none;
+        CHECK(vtw::command_for_event(none) == Command::None);
+        CHECK(vtw::command_for_key('l') == Command::OpenGoto);
+        CHECK(!ui.prompt.active);
+        vtw::apply_command(Command::OpenGoto, view, settings, ui);
+        CHECK(ui.prompt.active && ui.prompt.typed.empty());
+        ui.prompt = vtw::PromptState();
+    }
+
     // n shows and hides the city names (they start shown)
     CHECK(ui.names);
     vtw::apply_command(Command::ToggleNames, view, settings, ui);

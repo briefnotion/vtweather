@@ -11,7 +11,7 @@
 //   ./build/vtweather [--settings FILE] [--basemap FILE] [--offline] [--no-cache] [--no-color]
 //                     [--fps N] [--cols N --rows N]
 //
-// Keys: + - zoom, w a s d move, r back to the settings' place, g grid, n city names, q quit. --offline asks the
+// Keys: + - zoom, w a s d move, r back to the settings' place, g grid, n city names, / go to a city, q quit. --offline asks the
 // radar service for nothing (for trying the keys, or with no network).
 
 #include <chrono>
@@ -25,6 +25,8 @@
 #include "draw_radar.h"
 #include "ground_map.h"
 #include "input.h"
+#include "keys.h"
+#include "prompt.h"
 #include "place_labels.h"
 #include "radar_feed.h"
 #include "store.h"
@@ -61,6 +63,7 @@ int main(int argc, char** argv) {
     vtw::GroundMap ground(basemap);
     vtw::PlaceLabels places(basemap);
     vtw::UiState ui;
+    vtw::KeyReader reader;
 
     // the folder for what is kept between runs (none with --no-cache or no home folder)
     const std::string cache_dir = no_cache ? "" : (settings.cache_dir.empty() ? vtw::default_cache_dir() : settings.cache_dir);
@@ -111,9 +114,14 @@ int main(int argc, char** argv) {
             view.set_size(cols, rows - 1);
         }
 
-        // gather: keys, which become commands on the view
-        for (char key; (key = display.next_key()) != 0;)
-            vtw::apply_command(vtw::command_for_key(key), view, settings, ui);
+        // gather: keys, which become commands on the view (or typing, while the go-to prompt is open)
+        for (char c; (c = display.next_key()) != 0;) reader.feed(c);
+        reader.flush();
+        for (vtw::Key key; reader.next(key);) {
+            if (ui.prompt.active) vtw::prompt_key(ui.prompt, key, basemap, view);
+            else vtw::apply_command(vtw::command_for_event(key), view, settings, ui);
+        }
+        display.quit_on_q = !ui.prompt.active;        // while typing, a q is a letter
 
         // gather: a new radar picture, if one has arrived, and a request if it is time
         radar.update(view, t);
@@ -131,6 +139,7 @@ int main(int argc, char** argv) {
         }
         vtw::draw_marker(view, settings.home, picture);
         vtw::draw_readout(view, settings, notes, radar.status(t), picture);
+        vtw::draw_prompt(ui.prompt, basemap, picture);
         display.bar(picture, info, t, true);
 
         // show, then wait for the next frame

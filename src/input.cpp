@@ -13,6 +13,18 @@ Command command_for_key(char key) {
         case 'r': case 'R': return Command::Reset;
         case 'g': case 'G': return Command::ToggleGraticule;
         case 'n': case 'N': return Command::ToggleNames;
+        case '/': case 'l': case 'L': return Command::OpenGoto;
+        default: return Command::None;
+    }
+}
+
+Command command_for_event(const Key& key) {
+    switch (key.kind) {
+        case KeyKind::Char: return command_for_key(key.ch);
+        case KeyKind::Up: return Command::PanUp;
+        case KeyKind::Down: return Command::PanDown;
+        case KeyKind::Left: return Command::PanLeft;
+        case KeyKind::Right: return Command::PanRight;
         default: return Command::None;
     }
 }
@@ -31,6 +43,7 @@ void apply_command(Command command, View& view, const Settings& settings, UiStat
             break;
         case Command::ToggleGraticule: ui.graticule = !ui.graticule; break;
         case Command::ToggleNames: ui.names = !ui.names; break;
+        case Command::OpenGoto: ui.prompt = PromptState(); ui.prompt.active = true; break;
         case Command::None: break;
     }
 }

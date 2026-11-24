@@ -80,7 +80,8 @@ checksum) and refuses anything odd with a reason, since the pictures come off th
 |---|---|
 | `+` or `=` | zoom in (each press shows 80 % of the distance; the closest is 2 km across) |
 | `-` or `_` | zoom out (the widest is 6000 km) |
-| `w` `a` `s` `d` | move the view up (north), left, down, right, by a tenth of the screen; hold a key to keep moving |
+| `w` `a` `s` `d`, or the arrow keys | move the view up (north), left, down, right, by a tenth of the screen; hold a key to keep moving |
+| `/` or `l` | go to a city: type part of its name, the matches are listed (the biggest first), Up and Down choose one, Enter goes there and Escape gives up |
 | `r` | back to the place and zoom in your settings |
 | `g` | show or hide a grid of latitude and longitude lines |
 | `n` | show or hide the city names |
@@ -90,6 +91,17 @@ Moving or zooming out onto an area the radar picture does not cover makes the pr
 one, but only after you have stayed there for a second, so holding a key does not send a request
 for every press. Zooming in never needs a new picture: the radar's own detail is about 1 km.
 `--offline` asks the radar service for nothing at all, which is handy for trying the keys.
+
+## Going to a place by name
+
+Press `/` (or `l`) and type part of a city's name, such as `wich` or `portland`. The cities that
+match are listed above the line you are typing (those that start with what you typed first, the
+biggest first), with their latitude and longitude, because several places can share a name. Up and
+Down choose one, Enter moves the view there (zooming in to 150 km across if you were further out
+than 400 km) and Escape closes the prompt. While it is open a `q` is a letter like any other, so the
+program does not quit. The names come from the base map's own list of about 2300 cities, so this
+works offline and asks nobody anything. Arrow keys work through the escape sequences a Linux
+terminal sends; they are not read on Windows yet.
 
 ## Kept between runs
 

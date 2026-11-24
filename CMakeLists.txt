@@ -20,7 +20,7 @@ find_package(Threads REQUIRED)
 
 set(VTWEATHER_SOURCES src/settings.cpp src/view.cpp src/draw_grid.cpp src/request_policy.cpp src/fetch.cpp src/inflate.cpp src/png.cpp src/radar_frame.cpp src/radar_source.cpp src/radar_worker.cpp
     src/radar_scheduler.cpp src/radar_cache.cpp src/store.cpp src/radar_feed.cpp src/cell_grid.cpp src/draw_radar.cpp src/input.cpp src/basemap.cpp src/ground_map.cpp src/draw_ground.cpp
-    src/place_labels.cpp src/draw_places.cpp)
+    src/place_labels.cpp src/draw_places.cpp src/keys.cpp src/prompt.cpp)
 
 set(VTWEATHER_SOURCES_NO_MAIN ${VTWEATHER_SOURCES})
 add_executable(vtweather src/main.cpp ${VTWEATHER_SOURCES})
@@ -35,7 +35,7 @@ endif()
 
 # tests: cmake --build build && ctest --test-dir build --output-on-failure
 enable_testing()
-add_executable(vtweather_tests tests/tests.cpp src/settings.cpp src/view.cpp src/request_policy.cpp src/radar_scheduler.cpp src/radar_cache.cpp src/radar_frame.cpp src/png.cpp src/inflate.cpp src/input.cpp)
+add_executable(vtweather_tests tests/tests.cpp src/settings.cpp src/view.cpp src/request_policy.cpp src/radar_scheduler.cpp src/radar_cache.cpp src/radar_frame.cpp src/png.cpp src/inflate.cpp src/input.cpp src/keys.cpp src/prompt.cpp src/basemap.cpp)
 target_include_directories(vtweather_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(vtweather_tests PRIVATE nlohmann_json::nlohmann_json)
 add_test(NAME vtweather_tests COMMAND vtweather_tests)
@@ -102,3 +102,9 @@ add_executable(vtweather_store_tests tests/store_tests.cpp src/store.cpp)
 target_include_directories(vtweather_store_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(vtweather_store_tests PRIVATE nlohmann_json::nlohmann_json)
 add_test(NAME vtweather_store_tests COMMAND vtweather_store_tests)
+
+# reading keys and the go-to prompt
+add_executable(vtweather_prompt_tests tests/prompt_tests.cpp src/keys.cpp src/prompt.cpp src/basemap.cpp src/view.cpp)
+target_include_directories(vtweather_prompt_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_definitions(vtweather_prompt_tests PRIVATE VTW_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
+add_test(NAME vtweather_prompt_tests COMMAND vtweather_prompt_tests)

@@ -4,29 +4,34 @@
 // screen; holding a key repeats it, which gives smooth movement.
 //
 //   +  =        zoom in            -  _        zoom out
-//   w  a  s  d  pan up, left, down, right (the map moves under you: w looks further north)
+//   w a s d, or the arrow keys: move up, left, down, right (w looks further north)
+//   /  or  l    go to a city: type its name, Up and Down choose, Enter goes, Escape gives up
 //   r           back to the place and zoom in the settings
 //   g           show or hide the grid of latitude and longitude lines
 //   n           show or hide the city names
 #pragma once
 
+#include "keys.h"
+#include "prompt.h"
 #include "settings.h"
 #include "view.h"
 
 namespace vtw {
 
-enum class Command { None, ZoomIn, ZoomOut, PanLeft, PanRight, PanUp, PanDown, Reset, ToggleGraticule, ToggleNames };
+enum class Command { None, ZoomIn, ZoomOut, PanLeft, PanRight, PanUp, PanDown, Reset, ToggleGraticule, ToggleNames, OpenGoto };
 
 // What is shown, apart from where the view is.
 struct UiState {
     bool graticule = false;
     bool names = true;
+    PromptState prompt;                // the go-to prompt, when it is open
 };
 
 constexpr double ZOOM_STEP = 0.8;          // one press shows 80 % of the distance (zooms in)
 constexpr double PAN_STEP = 0.10;          // one press moves a tenth of the screen
 
 Command command_for_key(char key);
+Command command_for_event(const Key& key);      // a key as the KeyReader gives it: arrows too
 
 void apply_command(Command command, View& view, const Settings& settings, UiState& ui);
 
