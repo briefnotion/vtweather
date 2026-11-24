@@ -19,7 +19,8 @@ find_package(CURL REQUIRED)                 # fetching from the web (libcurl, an
 find_package(Threads REQUIRED)
 
 set(VTWEATHER_SOURCES src/settings.cpp src/view.cpp src/draw_grid.cpp src/request_policy.cpp src/fetch.cpp src/inflate.cpp src/png.cpp src/radar_frame.cpp src/radar_source.cpp src/radar_worker.cpp
-    src/radar_scheduler.cpp src/radar_feed.cpp src/cell_grid.cpp src/draw_radar.cpp src/input.cpp src/basemap.cpp src/ground_map.cpp src/draw_ground.cpp)
+    src/radar_scheduler.cpp src/radar_feed.cpp src/cell_grid.cpp src/draw_radar.cpp src/input.cpp src/basemap.cpp src/ground_map.cpp src/draw_ground.cpp
+    src/place_labels.cpp src/draw_places.cpp)
 
 set(VTWEATHER_SOURCES_NO_MAIN ${VTWEATHER_SOURCES})
 add_executable(vtweather src/main.cpp ${VTWEATHER_SOURCES})
@@ -89,3 +90,9 @@ add_executable(vtweather_ground_tests tests/ground_tests.cpp src/basemap.cpp src
 target_include_directories(vtweather_ground_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_definitions(vtweather_ground_tests PRIVATE VTW_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
 add_test(NAME vtweather_ground_tests COMMAND vtweather_ground_tests)
+
+# city names: which to show, and where
+add_executable(vtweather_places_tests tests/places_tests.cpp src/place_labels.cpp src/basemap.cpp src/view.cpp)
+target_include_directories(vtweather_places_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_definitions(vtweather_places_tests PRIVATE VTW_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
+add_test(NAME vtweather_places_tests COMMAND vtweather_places_tests)

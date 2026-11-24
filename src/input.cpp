@@ -12,6 +12,7 @@ Command command_for_key(char key) {
         case 's': case 'S': return Command::PanDown;
         case 'r': case 'R': return Command::Reset;
         case 'g': case 'G': return Command::ToggleGraticule;
+        case 'n': case 'N': return Command::ToggleNames;
         default: return Command::None;
     }
 }
@@ -29,6 +30,7 @@ void apply_command(Command command, View& view, const Settings& settings, UiStat
             view.set_zoom_km(settings.zoom_km);
             break;
         case Command::ToggleGraticule: ui.graticule = !ui.graticule; break;
+        case Command::ToggleNames: ui.names = !ui.names; break;
         case Command::None: break;
     }
 }

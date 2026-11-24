@@ -6,7 +6,8 @@
 //
 // For each of three levels of detail (110m, 50m, 10m) it reads the land and lake polygons and the
 // country borders, state and province borders and rivers as lines, cuts the finest level down to
-// North America (the radar covers only the United States and the finest level is the largest),
+// North America (the radar covers only the United States and the finest level is the largest) and
+// reads the cities (the 10m file inside North America, the 50m file elsewhere),
 // drops points that do not matter at that level (Douglas-Peucker) and writes everything as whole
 // numbers of 1e-5 degrees.
 #include <algorithm>
@@ -222,6 +223,45 @@ bool read_layer(const std::string& folder, const Level& level, const char* what,
     return true;
 }
 
+// Cities from Natural Earth's populated places: the 10m file inside North America (the finest
+// level's area), the 50m file elsewhere. Names are kept as plain ASCII.
+constexpr int MIN_NORTH_AMERICA_POPULATION = 5000;
+
+bool read_places(const std::string& folder, vtw::BaseMap& map) {
+    const vtw::GeoBox area = LEVELS[2].coverage;
+    size_t counts[2] = {0, 0};
+    for (int fine = 1; fine >= 0; fine--) {
+        const std::string path = folder + "/ne_" + (fine ? "10m" : "50m") + "_populated_places.geojson";
+        std::ifstream file(path);
+        if (!file) { std::fprintf(stderr, "cannot open %s (run tools/get_natural_earth.sh)\n", path.c_str()); return false; }
+        const Json json = Json::parse(file, nullptr, false);
+        if (json.is_discarded() || !json.contains("features")) { std::fprintf(stderr, "%s is not GeoJSON\n", path.c_str()); return false; }
+        for (const Json& feature : json["features"]) {
+            if (feature["geometry"].is_null()) continue;
+            const double lon = feature["geometry"]["coordinates"][0].get<double>();
+            const double lat = feature["geometry"]["coordinates"][1].get<double>();
+            const bool inside = lon >= area.west && lon <= area.east && lat >= area.south && lat <= area.north;
+            if (inside != (fine == 1)) continue;                  // fine file inside, coarse file outside
+            const Json& props = feature["properties"];
+            const long population = props["POP_MAX"].is_number() ? props["POP_MAX"].get<long>() : 0;
+            if (fine && population < MIN_NORTH_AMERICA_POPULATION) continue;
+            std::string name;
+            for (char c : props["NAMEASCII"].get<std::string>())
+                if (c >= 32 && c < 127) name += c;                // plain ASCII only
+            if (name.empty()) continue;
+            vtw::MapPlace place;
+            place.lon = (int32_t)std::lround(lon * vtw::MAP_UNITS_PER_DEGREE);
+            place.lat = (int32_t)std::lround(lat * vtw::MAP_UNITS_PER_DEGREE);
+            place.population = (uint32_t)std::max(0L, population);
+            place.name = name.substr(0, 60);
+            map.places.push_back(std::move(place));
+            counts[fine]++;
+        }
+    }
+    std::printf("places: %zu in North America (10m), %zu elsewhere (50m)\n", counts[1], counts[0]);
+    return true;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -237,6 +277,7 @@ int main(int argc, char** argv) {
         if (!read_layer(argv[1], level, "states", vtw::LayerKind::State, map, "admin_1_states_provinces_lines")) return 1;
         if (!read_layer(argv[1], level, "rivers", vtw::LayerKind::River, map, "rivers_lake_centerlines")) return 1;
     }
+    if (!read_places(argv[1], map)) return 1;
     std::string error;
     if (!vtw::save_basemap(argv[2], map, error)) { std::fprintf(stderr, "%s\n", error.c_str()); return 1; }
     std::printf("wrote %s (%zu bytes)\n", argv[2], vtw::write_basemap(map).size());

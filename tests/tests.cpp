@@ -366,6 +366,7 @@ void input_tests() {
     CHECK(vtw::command_for_key('s') == Command::PanDown && vtw::command_for_key('a') == Command::PanLeft);
     CHECK(vtw::command_for_key('d') == Command::PanRight && vtw::command_for_key('r') == Command::Reset);
     CHECK(vtw::command_for_key('g') == Command::ToggleGraticule);
+    CHECK(vtw::command_for_key('n') == Command::ToggleNames && vtw::command_for_key('N') == Command::ToggleNames);
     CHECK(vtw::command_for_key('x') == Command::None && vtw::command_for_key('\n') == Command::None);
 
     vtw::Settings settings;                                   // Wichita, 80 km
@@ -422,6 +423,13 @@ void input_tests() {
     CHECK(ui.graticule);
     vtw::apply_command(Command::ToggleGraticule, view, settings, ui);
     CHECK(!ui.graticule);
+
+    // n shows and hides the city names (they start shown)
+    CHECK(ui.names);
+    vtw::apply_command(Command::ToggleNames, view, settings, ui);
+    CHECK(!ui.names);
+    vtw::apply_command(Command::ToggleNames, view, settings, ui);
+    CHECK(ui.names);
 
     // --offline and other flags are taken out of the command line
     {

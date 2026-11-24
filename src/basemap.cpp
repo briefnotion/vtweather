@@ -11,10 +11,11 @@ namespace vtw {
 
 namespace {
 
-constexpr char MAGIC[8] = {'V', 'T', 'W', 'M', 'A', 'P', '2', '\n'};
+constexpr char MAGIC[8] = {'V', 'T', 'W', 'M', 'A', 'P', '3', '\n'};
 constexpr uint32_t MAX_LAYERS = 64;
 constexpr uint32_t MAX_POLYGONS = 2000000;
 constexpr uint32_t MAX_LINES = 4000000;
+constexpr uint32_t MAX_PLACES = 1000000;
 constexpr uint32_t MAX_RINGS = 1000000;
 constexpr uint64_t MAX_POINTS = 20000000;
 
@@ -117,6 +118,21 @@ bool read_basemap(const uint8_t* data, size_t size, BaseMap& map, std::string& e
         if (in.bad) return fail("the base map file is damaged");
         map.layers.push_back(std::move(layer));
     }
+
+    const uint32_t places = in.u32();
+    if (in.bad || places > MAX_PLACES || (uint64_t)places * 13 > in.left()) return fail("the base map file is damaged");
+    map.places.reserve(places);
+    for (uint32_t i = 0; i < places; i++) {
+        MapPlace place;
+        place.lon = in.i32();
+        place.lat = in.i32();
+        place.population = in.u32();
+        const uint8_t length = in.u8();
+        if (in.bad || length > in.left()) return fail("the base map file is damaged");
+        place.name.assign((const char*)in.data + in.pos, length);
+        in.pos += length;
+        map.places.push_back(std::move(place));
+    }
     return true;
 }
 
@@ -169,6 +185,15 @@ std::string write_basemap(const BaseMap& map) {
                 for (int32_t v : ring) put_i32(s, v);
             }
         }
+    }
+    put32(s, (uint32_t)map.places.size());
+    for (const MapPlace& place : map.places) {
+        put_i32(s, place.lon);
+        put_i32(s, place.lat);
+        put32(s, place.population);
+        const size_t length = std::min<size_t>(place.name.size(), 255);
+        s += (char)length;
+        s.append(place.name, 0, length);
     }
     return s;
 }

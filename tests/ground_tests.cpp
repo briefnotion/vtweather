@@ -96,6 +96,9 @@ void file_tests() {
     map.layers.push_back(layer_of(LayerKind::Lake, 2, GeoBox{5, -170, 75, -50}, {polygon_of({square(-1.5, -2.5, 3.25, 4.75)})}));
     map.layers.push_back(lines_of(LayerKind::River, 1, WORLD, {map_line({{0, 0}, {1.5, 2.25}, {3, 1}}), map_line({{-5, -5}, {-6, -7}})}));
     map.layers.push_back(lines_of(LayerKind::Country, 2, WORLD, {}));
+    map.places.push_back({-9712345, 3769000, 389965, "Wichita"});
+    map.places.push_back({-12233000, 4760000, 737015, "Seattle"});
+    map.places.push_back({100, -200, 0, ""});
     const std::string bytes = vtw::write_basemap(map);
 
     BaseMap back;
@@ -106,6 +109,9 @@ void file_tests() {
     CHECK(back.layers[2].lines[0].points == map.layers[2].lines[0].points);
     CHECK_NEAR(back.layers[2].lines[0].box.north, 2.25, 1e-9);
     CHECK(back.layers[3].kind == LayerKind::Country && back.layers[3].lines.empty());
+    CHECK(back.places.size() == 3);
+    CHECK(back.places[0].name == "Wichita" && back.places[0].lon == -9712345 && back.places[0].lat == 3769000);
+    CHECK(back.places[1].population == 737015 && back.places[2].name.empty() && back.places[2].lat == -200);
     CHECK(back.layers[0].kind == LayerKind::Land && back.layers[0].detail == 0);
     CHECK(back.layers[1].kind == LayerKind::Lake && back.layers[1].detail == 2);
     CHECK_NEAR(back.layers[1].coverage.west, -170, 1e-9);
@@ -454,6 +460,7 @@ void real_tests() {
     const std::string path = vtw::find_basemap_file(std::string(VTW_DATA_DIR) + "/basemap.bin");
     CHECK(!path.empty());
     if (path.empty() || !vtw::load_basemap(path, map, error)) { std::printf("  %s\n", error.c_str()); CHECK(false); return; }
+    CHECK(map.places.size() > 2000);                            // cities too
     CHECK(map.layers.size() == 15);                          // five layers at each of three levels
 
     struct Place { const char* name; double lat, lon; Ground ground; };

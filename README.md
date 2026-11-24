@@ -4,11 +4,11 @@ An overhead map of where you are, zoomable, with the real-time rain on it, drawn
 letters in a terminal. Built on [vtscreen](https://github.com/briefnotion/vtscreen).
 
 **Status:** it works end to end, in a first form. It reads its settings, draws the land and water
-(a base map made from Natural Earth data, with rivers and borders), asks NOAA's radar service for a picture of the area on
+(a base map made from Natural Earth data, with rivers, borders and city names), asks NOAA's radar service for a picture of the area on
 screen (in the background, so the screen never waits), turns the colours into rain strengths and
 draws the rain as letters on top. You can zoom and move around with the keys. It follows the window
 being resized, and fetches the radar again every few minutes and when the view moves off the
-picture. Not yet: place names on the map, the animated loop of the last hour or two, alerts.
+picture. Not yet: the animated loop of the last hour or two, alerts.
 
 ## Build and run
 
@@ -77,6 +77,7 @@ checksum) and refuses anything odd with a reason, since the pictures come off th
 | `w` `a` `s` `d` | move the view up (north), left, down, right, by a tenth of the screen; hold a key to keep moving |
 | `r` | back to the place and zoom in your settings |
 | `g` | show or hide a grid of latitude and longitude lines |
+| `n` | show or hide the city names |
 | `q` | quit |
 
 Moving or zooming out onto an area the radar picture does not cover makes the program ask for a new
@@ -86,8 +87,8 @@ for every press. Zooming in never needs a new picture: the radar's own detail is
 
 ## The base map
 
-The ground is drawn from `data/basemap.bin` (3 MB), a compact file of land and lake polygons and of
-country borders, state and province borders and rivers as lines, which the program reads itself
+The ground is drawn from `data/basemap.bin` (3 MB), a compact file of land and lake polygons, of
+country borders, state and province borders and rivers as lines, and of about 2300 cities, which the program reads itself
 (`src/basemap.cpp`). It was made from [Natural Earth](https://www.naturalearthdata.com) (public
 domain) at three levels of detail, about 1:110 million for views of thousands of kilometres,
 1:50 million for hundreds and 1:10 million for close views; the finest level covers North America
@@ -97,13 +98,20 @@ Water is a dark blue background and land a dark green one with faint dots. River
 country borders and the coast are lines, each a step brighter than the last (blue, violet, pink,
 tan), all kept dim so the rain stands out; without colour water is blank, land is faint dots and
 each kind of line has its own brightness. The ground of a view is worked out again only when the
-view changes. The file is found in `data/` of the folder you run from, or `../data/`, or the source
+view changes.
+
+City names (`n` hides them) are a dot and the name beside it, as text so they are always readable,
+white for big cities and grey for small ones. A view of thousands of kilometres shows only the
+biggest cities (3 million and up), and each step closer adds smaller ones, down to towns of 15 000
+or less when you are close. The biggest are placed first, and a name that would run into one
+already placed, or off the screen, is left out, so names never overlap; if there is no room on the
+right of the dot the name goes on the left. Names are plain ASCII (Natural Earth's ASCII names). The file is found in `data/` of the folder you run from, or `../data/`, or the source
 tree it was built from; `--basemap FILE` names another. Without one the program still runs, with no
 ground.
 
 To remake the file (only needed if the map data changes):
 
-    ./tools/get_natural_earth.sh                          downloads the GeoJSON (about 50 MB), once, politely
+    ./tools/get_natural_earth.sh                          downloads the GeoJSON (about 75 MB), once, politely
     ./build/make_basemap tools/natural_earth data/basemap.bin
 
 ## Seeing the rain
@@ -164,7 +172,8 @@ mapping", start the program with `setarch x86_64 -R`).
 
 ## Third-party code and data
 
-- [Natural Earth](https://www.naturalearthdata.com) (public domain): the land, lake, border and river shapes in `data/basemap.bin`.
+- [Natural Earth](https://www.naturalearthdata.com) (public domain): the land, lake, border, river and city data in `data/basemap.bin`. Natural
+  Earth asks for no credit; "Made with Natural Earth" is its suggested line.
 - [vtscreen](https://github.com/briefnotion/vtscreen) (MIT), the drawing library, in `vtscreen/`.
 - [nlohmann/json](https://github.com/nlohmann/json) (MIT), in `third_party/json/`, pinned to
   release v3.12.0.

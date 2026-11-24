@@ -10,7 +10,7 @@
 //   ./build/vtweather [--settings FILE] [--basemap FILE] [--offline] [--no-color] [--fps N]
 //                     [--cols N --rows N]
 //
-// Keys: + - zoom, w a s d move, r back to the settings' place, g grid, q quit. --offline asks the
+// Keys: + - zoom, w a s d move, r back to the settings' place, g grid, n city names, q quit. --offline asks the
 // radar service for nothing (for trying the keys, or with no network).
 
 #include <cstdio>
@@ -20,9 +20,11 @@
 #include "basemap.h"
 #include "draw_grid.h"
 #include "draw_ground.h"
+#include "draw_places.h"
 #include "draw_radar.h"
 #include "ground_map.h"
 #include "input.h"
+#include "place_labels.h"
 #include "radar_feed.h"
 #include "settings.h"
 #include "view.h"
@@ -54,6 +56,7 @@ int main(int argc, char** argv) {
         else if (!vtw::load_basemap(file, basemap, problem)) notes += "base map: " + problem + "\n";
     }
     vtw::GroundMap ground(basemap);
+    vtw::PlaceLabels places(basemap);
     vtw::UiState ui;
 
     vtw::View view;
@@ -96,6 +99,10 @@ int main(int argc, char** argv) {
         vtw::draw_ground(ground, picture);
         if (ui.graticule) vtw::draw_graticule(view, grid, picture);
         vtw::draw_radar(grid, radar ? radar->frame() : no_rain, picture);
+        if (ui.names) {
+            places.update(view);
+            vtw::draw_places(places, picture);
+        }
         vtw::draw_marker(view, settings.home, picture);
         vtw::draw_readout(view, settings, notes, radar ? radar->status(t) : "radar: off (--offline)", picture);
         display.bar(picture, info, t, true);

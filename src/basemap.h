@@ -1,5 +1,5 @@
-// BaseMap: the land and water of the earth as polygons, and its borders and rivers as lines, read
-// from a compact binary file (data/basemap.bin). The file is made once, at development time, from Natural Earth's public
+// BaseMap: the land and water of the earth as polygons, its borders and rivers as lines, and its
+// cities as points with names, read from a compact binary file (data/basemap.bin). The file is made once, at development time, from Natural Earth's public
 // domain map data by tools/make_basemap.cpp; the program only reads it.
 //
 // There are three levels of detail (about 1:110 million, 1:50 million and 1:10 million), each a
@@ -8,12 +8,13 @@
 // a place is inside it by the even-odd rule. Coordinates are whole numbers of 1e-5 degrees (about
 // a metre).
 //
-// File format, little-endian:  "VTWMAP2\n"; u32 layers; for each layer: u8 kind (0 land, 1 lake,
+// File format, little-endian:  "VTWMAP3\n"; u32 layers; for each layer: u8 kind (0 land, 1 lake,
 // 2 country border, 3 state border, 4 river), u8 detail (0, 1, 2), u16 0, i32 south, west, north,
 // east of its coverage, u32 count. For land and lake layers the count is of polygons, each: i32
 // south, west, north, east, u32 rings, and for each ring u32 points then that many i32 pairs
 // (longitude, latitude). For the line layers the count is of lines, each: i32 south, west, north,
-// east, u32 points, then that many i32 pairs.
+// east, u32 points, then that many i32 pairs. After the layers: u32 places, each: i32 longitude,
+// i32 latitude, u32 population, u8 name length, then the name (plain ASCII).
 #pragma once
 
 #include <cstddef>
@@ -50,8 +51,15 @@ struct MapLayer {
     std::vector<MapLine> lines;                  // border and river layers
 };
 
+struct MapPlace {
+    int32_t lon = 0, lat = 0;                    // 1e-5 degrees
+    uint32_t population = 0;
+    std::string name;                            // plain ASCII
+};
+
 struct BaseMap {
     std::vector<MapLayer> layers;
+    std::vector<MapPlace> places;                // cities and towns, all the levels together
 };
 
 // Read the file's bytes. Anything wrong (a wrong signature, a cut-off or impossible file) gives
