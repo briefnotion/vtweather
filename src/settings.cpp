@@ -93,4 +93,14 @@ std::string take_settings_option(int& argc, char** argv) {
     return "";
 }
 
+bool take_flag(int& argc, char** argv, const char* flag) {
+    for (int i = 1; i < argc; i++) {
+        if (std::string(argv[i]) != flag) continue;
+        for (int j = i; j + 1 < argc; j++) argv[j] = argv[j + 1];
+        argc -= 1;
+        return true;
+    }
+    return false;
+}
+
 }  // namespace vtw

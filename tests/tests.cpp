@@ -1,4 +1,4 @@
-// Tests for the View, the settings loader, the request policy and the radar scheduler. Plain asserts, no framework:
+// Tests for the View, the settings loader, the request policy, the radar scheduler and the keys. Plain asserts, no framework:
 // the program prints what failed and exits with the number of failures.
 #include <cmath>
 #include <cstdio>
@@ -8,6 +8,7 @@
 
 #include "check.h"
 
+#include "../src/input.h"
 #include "../src/radar_scheduler.h"
 #include "../src/request_policy.h"
 #include "../src/settings.h"
@@ -356,6 +357,75 @@ void scheduler_tests() {
     }
 }
 
+// What the keys do
+void input_tests() {
+    using vtw::Command;
+    CHECK(vtw::command_for_key('+') == Command::ZoomIn && vtw::command_for_key('=') == Command::ZoomIn);
+    CHECK(vtw::command_for_key('-') == Command::ZoomOut && vtw::command_for_key('_') == Command::ZoomOut);
+    CHECK(vtw::command_for_key('w') == Command::PanUp && vtw::command_for_key('W') == Command::PanUp);
+    CHECK(vtw::command_for_key('s') == Command::PanDown && vtw::command_for_key('a') == Command::PanLeft);
+    CHECK(vtw::command_for_key('d') == Command::PanRight && vtw::command_for_key('r') == Command::Reset);
+    CHECK(vtw::command_for_key('x') == Command::None && vtw::command_for_key('\n') == Command::None);
+
+    vtw::Settings settings;                                   // Wichita, 80 km
+    View view = make_view(settings.home.lat, settings.home.lon, settings.zoom_km, 100, 30);
+
+    // zoom: a step in shows 80 % of the distance, a step out undoes it
+    vtw::apply_command(Command::ZoomIn, view, settings);
+    CHECK_NEAR(view.zoom_km(), 64, 1e-9);
+    vtw::apply_command(Command::ZoomOut, view, settings);
+    CHECK_NEAR(view.zoom_km(), 80, 1e-9);
+    for (int i = 0; i < 60; i++) vtw::apply_command(Command::ZoomIn, view, settings);
+    CHECK_NEAR(view.zoom_km(), vtw::MIN_KM_ACROSS, 1e-9);     // stops at the closest zoom
+    for (int i = 0; i < 80; i++) vtw::apply_command(Command::ZoomOut, view, settings);
+    CHECK_NEAR(view.zoom_km(), vtw::MAX_KM_ACROSS, 1e-9);     // and the widest
+
+    // pan: a tenth of the screen; d looks east, w looks north, and the screen follows
+    view = make_view(settings.home.lat, settings.home.lon, settings.zoom_km, 100, 30);
+    vtw::apply_command(Command::PanRight, view, settings);
+    CHECK(view.centre().lon > settings.home.lon);
+    CHECK_NEAR(view.centre().lat, settings.home.lat, 1e-9);
+    double col, row;
+    view.to_cell(settings.home, col, row);
+    CHECK_NEAR(col, 50 - 10, 1e-6);                           // home is 10 columns left of the middle now
+    vtw::apply_command(Command::PanLeft, view, settings);
+    CHECK_NEAR(view.centre().lon, settings.home.lon, 1e-9);
+    vtw::apply_command(Command::PanUp, view, settings);
+    CHECK(view.centre().lat > settings.home.lat);
+    view.to_cell(settings.home, col, row);
+    CHECK_NEAR(row, 15 + 3, 0.01);                            // 3 rows (a tenth of 30) down from the middle (the scale shifts a hair with latitude)
+    vtw::apply_command(Command::PanDown, view, settings);
+    vtw::apply_command(Command::PanDown, view, settings);
+    CHECK(view.centre().lat < settings.home.lat);
+
+    // reset goes back to the settings' place and zoom
+    vtw::apply_command(Command::ZoomIn, view, settings);
+    vtw::apply_command(Command::PanRight, view, settings);
+    vtw::apply_command(Command::Reset, view, settings);
+    CHECK_NEAR(view.centre().lat, settings.home.lat, 1e-9);
+    CHECK_NEAR(view.centre().lon, settings.home.lon, 1e-9);
+    CHECK_NEAR(view.zoom_km(), settings.zoom_km, 1e-9);
+
+    // the pan step is the same fraction of the screen at any zoom, so it covers more ground when zoomed out
+    View near = make_view(37.69, -97.34, 10, 100, 30), far = make_view(37.69, -97.34, 1000, 100, 30);
+    const GeoPoint n0 = near.centre(), f0 = far.centre();
+    vtw::apply_command(Command::PanRight, near, settings);
+    vtw::apply_command(Command::PanRight, far, settings);
+    CHECK(vtw::distance_km(f0, far.centre()) > 50 * vtw::distance_km(n0, near.centre()));
+    CHECK_NEAR(vtw::distance_km(n0, near.centre()), 1.0, 0.05);       // a tenth of 10 km
+
+    // --offline and other flags are taken out of the command line
+    {
+        char a0[] = "prog", a1[] = "--offline", a2[] = "--fps", a3[] = "10";
+        char* argv[] = {a0, a1, a2, a3, nullptr};
+        int argc = 4;
+        CHECK(vtw::take_flag(argc, argv, "--offline"));
+        CHECK(argc == 3 && std::string(argv[1]) == "--fps" && std::string(argv[2]) == "10");
+        CHECK(!vtw::take_flag(argc, argv, "--offline"));
+        CHECK(argc == 3);
+    }
+}
+
 }  // namespace
 
 int main() {
@@ -363,6 +433,7 @@ int main() {
     settings_tests();
     policy_tests();
     scheduler_tests();
+    input_tests();
     if (failures == 0) std::printf("all tests passed\n");
     else std::printf("%d check(s) failed\n", failures);
     return failures;

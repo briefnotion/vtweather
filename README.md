@@ -6,9 +6,9 @@ letters in a terminal. Built on [vtscreen](https://github.com/briefnotion/vtscre
 **Status:** it works end to end, in a first form. It reads its settings, asks NOAA's radar service
 for a picture of the area on screen (in the background, so the screen never waits), turns the
 colours into rain strengths and draws the rain as letters on top of a graticule and a marker that
-stand in for the map. It follows the window being resized, and fetches again every few minutes
-and when the view moves off the picture. Not yet: keys for zoom and pan, a base map (coastlines
-and so on), the animated loop of the last hour or two, alerts.
+stand in for the map. You can zoom and move around with the keys. It follows the window being
+resized, and fetches again every few minutes and when the view moves off the picture. Not yet: a
+base map (coastlines and so on), the animated loop of the last hour or two, alerts.
 
 ## Build and run
 
@@ -20,7 +20,8 @@ clone with `--recursive`:
     cd vtweather
     cmake -B build
     cmake --build build
-    ./build/vtweather             (q quits; also --no-color, --fps N, --cols N --rows N)
+    ./build/vtweather             (q quits; also --settings FILE, --offline, --no-color, --fps N,
+                                   --cols N --rows N)
 
 If `vtscreen/` or `third_party/json/` is empty, run `git submodule update --init`.
 
@@ -66,6 +67,21 @@ The radar comes as PNG pictures, and there is no PNG reader in C++, so this proj
 ones, checks everything (the signature, every chunk's checksum, sizes, the compressed data's
 checksum) and refuses anything odd with a reason, since the pictures come off the network. A
 1500 x 1000 picture takes about 40 milliseconds.
+
+## Keys
+
+| key | does |
+|---|---|
+| `+` or `=` | zoom in (each press shows 80 % of the distance; the closest is 2 km across) |
+| `-` or `_` | zoom out (the widest is 6000 km) |
+| `w` `a` `s` `d` | move the view up (north), left, down, right, by a tenth of the screen; hold a key to keep moving |
+| `r` | back to the place and zoom in your settings |
+| `q` | quit |
+
+Moving or zooming out onto an area the radar picture does not cover makes the program ask for a new
+one, but only after you have stayed there for a second, so holding a key does not send a request
+for every press. Zooming in never needs a new picture: the radar's own detail is about 1 km.
+`--offline` asks the radar service for nothing at all, which is handy for trying the keys.
 
 ## Seeing the rain
 

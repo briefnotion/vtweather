@@ -34,4 +34,8 @@ Settings load_settings(const std::string& path, std::string& notes);
 // option reader does not see it) and return the path, or "" if it was not given.
 std::string take_settings_option(int& argc, char** argv);
 
+// Find a flag such as "--offline" in the command line, remove it from argv and say whether it
+// was there.
+bool take_flag(int& argc, char** argv, const char* flag);
+
 }  // namespace vtw

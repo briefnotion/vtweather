@@ -85,6 +85,7 @@ void draw_readout(const View& view, const Settings& settings, const std::string&
     picture.text(row++, 1, line);
     picture.text(row++, 1, "settings: " + settings.source);
     picture.text(row++, 1, radar_status, 150, 200, 150);
+    picture.text(row++, 1, "+ - zoom   w a s d move   r reset   q quit", 120, 120, 130);
 
     size_t start = 0;
     while (start < notes.size()) {                           // one amber line per note
