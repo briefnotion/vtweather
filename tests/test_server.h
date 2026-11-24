@@ -7,6 +7,9 @@
 //   /slow          waits 3 seconds, then 200
 //   /big           200, a 3 MB body
 //   /redirect      302 to /ok
+//   /png/NAME      200, the picture DIR/NAME.png (DIR is given to the constructor)
+//   /truncated/NAME  200, the first half of that file
+//   /xml           200, "text/xml": what a map server says about a request it cannot draw
 #pragma once
 
 #include <arpa/inet.h>
@@ -17,12 +20,14 @@
 
 #include <atomic>
 #include <chrono>
+#include <fstream>
+#include <sstream>
 #include <string>
 #include <thread>
 
 class TestServer {
 public:
-    TestServer() {
+    explicit TestServer(std::string data_dir = "") : data_dir_(std::move(data_dir)) {
         listener_ = socket(AF_INET, SOCK_STREAM, 0);
         int yes = 1;
         setsockopt(listener_, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes);
@@ -95,13 +100,23 @@ private:
             for (int i = 0; i < 60 && !stop_; i++) std::this_thread::sleep_for(std::chrono::milliseconds(50));
             reply(200, "text/plain", "late");
         } else if (path == "/big") reply(200, "application/octet-stream", std::string(3 * 1024 * 1024, 'b'));
-        else if (path.compare(0, 8, "/status/") == 0) {
+        else if (path == "/xml") reply(200, "text/xml", "<ServiceExceptionReport>no such layer</ServiceExceptionReport>");
+        else if (path.compare(0, 5, "/png/") == 0 || path.compare(0, 11, "/truncated/") == 0) {
+            const bool cut = path[1] == 't';
+            std::ifstream in(data_dir_ + "/" + path.substr(cut ? 11 : 5) + ".png", std::ios::binary);
+            std::stringstream bytes;
+            bytes << in.rdbuf();
+            std::string body = bytes.str();
+            if (cut) body.resize(body.size() / 2);
+            reply(200, "image/png", body);
+        } else if (path.compare(0, 8, "/status/") == 0) {
             const int status = std::stoi(path.substr(8));
             const size_t q = path.find("?retry=");
             reply(status, "text/plain", "no", q == std::string::npos ? "" : "Retry-After: " + path.substr(q + 7) + "\r\n");
         } else reply(404, "text/plain", "unknown");
     }
 
+    std::string data_dir_;
     int listener_ = -1;
     int port_ = 0;
     std::atomic<bool> stop_{false};

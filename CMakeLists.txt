@@ -18,7 +18,7 @@ add_subdirectory(third_party/json)          # nlohmann_json::nlohmann_json (sett
 find_package(CURL REQUIRED)                 # fetching from the web (libcurl, and its development files)
 find_package(Threads REQUIRED)
 
-set(VTWEATHER_SOURCES src/settings.cpp src/view.cpp src/draw_grid.cpp src/request_policy.cpp src/fetch.cpp src/inflate.cpp src/png.cpp src/radar_frame.cpp)
+set(VTWEATHER_SOURCES src/settings.cpp src/view.cpp src/draw_grid.cpp src/request_policy.cpp src/fetch.cpp src/inflate.cpp src/png.cpp src/radar_frame.cpp src/radar_source.cpp src/radar_worker.cpp)
 
 add_executable(vtweather src/main.cpp ${VTWEATHER_SOURCES})
 # the root is an include path, so sources say #include "vtscreen/vtscreen.h"
@@ -53,3 +53,11 @@ add_executable(vtweather_radar_frame_tests tests/radar_frame_tests.cpp src/radar
 target_include_directories(vtweather_radar_frame_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_definitions(vtweather_radar_frame_tests PRIVATE VTW_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
 add_test(NAME vtweather_radar_frame_tests COMMAND vtweather_radar_frame_tests)
+
+# the picture address, and the worker thread that fetches and reads pictures
+add_executable(vtweather_worker_tests tests/worker_tests.cpp src/radar_source.cpp src/radar_worker.cpp
+               src/radar_frame.cpp src/png.cpp src/inflate.cpp src/fetch.cpp src/request_policy.cpp)
+target_include_directories(vtweather_worker_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_definitions(vtweather_worker_tests PRIVATE VTW_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
+target_link_libraries(vtweather_worker_tests PRIVATE CURL::libcurl Threads::Threads)
+add_test(NAME vtweather_worker_tests COMMAND vtweather_worker_tests)

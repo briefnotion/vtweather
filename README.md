@@ -5,8 +5,8 @@ letters in a terminal. Built on [vtscreen](https://github.com/briefnotion/vtscre
 
 **Status:** just started. It reads its settings, has the View that turns places on the earth
 into places on the screen (zoom, pan, cell shape, ready for a rotated map), has a polite web
-fetcher, a PNG reader and a way of turning radar colours into rain strengths (none of them used
-by the screen yet), and shows a graticule with a marker as a stand-in for the
+fetcher, a PNG reader, a way of turning radar colours into rain strengths and a worker thread
+that fetches pictures in the background (none of them used by the screen yet), and shows a graticule with a marker as a stand-in for the
 map. Planned, in this order: one radar frame at a fixed place, zoom and pan keys,
 a base map, an animated loop of the last hour or two, alerts.
 
@@ -64,6 +64,18 @@ ones, checks everything (the signature, every chunk's checksum, sizes, the compr
 checksum) and refuses anything odd with a reason, since the pictures come off the network. A
 1500 x 1000 picture takes about 40 milliseconds.
 
+## The worker thread
+
+Fetching and reading a picture can take a second or more, so it never happens on the thread that
+draws. `RadarWorker` (`src/radar_worker.cpp`) has a thread of its own that fetches, reads the PNG
+and turns it into a `RadarFrame`. The main loop calls `request()` to ask for a picture and, once
+a frame, `take()` to see whether it has arrived; neither call ever waits.
+
+The two threads share exactly one atomic variable, the state (idle, requested, working, ready,
+stop). Whoever the state points at owns the request and the result, and handing over is a single
+store, so there are no locks. Quitting is quick even in the middle of a download. Because the
+worker's fetcher follows the politeness rules, a result can say that nothing was asked yet.
+
 ## Rain strength
 
 The radar service draws rain in the usual weather-service colours. `src/radar_frame.cpp` holds
@@ -87,7 +99,7 @@ picture of heavy rain.
 They cover the View (scale, cell shape, north up, rotation, round trips, pan, zoom), the settings
 loader (good, missing, damaged, wrong type, out of range), the request policy (with a made-up
 clock), the fetcher (pacing, backoff, the hourly limit, timeouts, size limit, cancelling), the
-PNG reader and the colour scale. The fetch tests talk to a small server on your own machine; nothing goes to the
+PNG reader, the colour scale and the worker thread. The fetch tests talk to a small server on your own machine; nothing goes to the
 internet.
 
 `tests/data/` holds the PNG test pictures, made by `tests/make_png_fixtures.py` (it needs Pillow,
@@ -95,7 +107,9 @@ which also checks the expected pixels, and it is only needed to remake them). Mo
 every colour type and bit depth, with transparency, every row filter and several compression
 styles. Two are real answers from NOAA's radar map service (US government data, public domain).
 The test also feeds the reader thousands of shortened and randomly damaged files; running it
-under ASan and UBSan is a good idea after any change to the reader.
+under ASan and UBSan is a good idea after any change to the reader. The worker and fetch tests
+can also be run under ThreadSanitizer (`-fsanitize=thread`; if it stops with "unexpected memory
+mapping", start the program with `setarch x86_64 -R`).
 
 ## Third-party code
 
