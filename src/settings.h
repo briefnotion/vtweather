@@ -1,0 +1,37 @@
+// Settings: where you are and a few options, read from a JSON file.
+//
+// The file is settings.json (your own, never committed) or, if there is none,
+// settings.sample.json. --settings PATH names another file. A missing or damaged
+// file never stops the program: the built-in defaults are used and `notes` says why.
+#pragma once
+
+#include <string>
+
+#include "view.h"
+
+namespace vtw {
+
+// The radar is updated about every 5 minutes, so asking more often only adds load to
+// a free service. Whatever the file says, the refresh is never shorter than this.
+constexpr int MIN_REFRESH_MINUTES = 5;
+
+struct Settings {
+    std::string place_name = "Wichita, Kansas (sample)";
+    GeoPoint home{37.69, -97.34};
+    double zoom_km = 80;              // ground distance across the screen
+    double cell_aspect = 2.0;         // how many times taller than wide a terminal cell is
+    int refresh_minutes = MIN_REFRESH_MINUTES;
+    std::string contact;              // for the User-Agent, optional
+    std::string source = "built-in defaults";   // the file the settings came from
+};
+
+// Read the settings. path "" means: settings.json, else settings.sample.json, else the
+// defaults. Anything odd (a missing file, a wrong type, a value out of range) is
+// described in notes, one line each, and the default or the nearest allowed value is used.
+Settings load_settings(const std::string& path, std::string& notes);
+
+// Find "--settings PATH" in the command line, remove it from argv (so the library's own
+// option reader does not see it) and return the path, or "" if it was not given.
+std::string take_settings_option(int& argc, char** argv);
+
+}  // namespace vtw
