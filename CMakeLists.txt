@@ -15,7 +15,11 @@ if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vtscreen/vtscreen.h" OR
                         "    git submodule update --init")
 endif()
 add_subdirectory(third_party/json)          # nlohmann_json::nlohmann_json (settings, API replies)
-find_package(CURL REQUIRED)                 # fetching from the web (libcurl, and its development files)
+find_package(CURL)                          # fetching from the web (libcurl, and its development files)
+if(NOT CURL_FOUND)
+    message(FATAL_ERROR "libcurl's development files are missing. On Debian, Ubuntu and Raspberry Pi OS:\n"
+                        "    sudo apt install libcurl4-openssl-dev")
+endif()
 find_package(Threads REQUIRED)
 
 set(VTWEATHER_SOURCES src/settings.cpp src/view.cpp src/draw_grid.cpp src/request_policy.cpp src/fetch.cpp src/inflate.cpp src/png.cpp src/radar_frame.cpp src/radar_source.cpp src/radar_worker.cpp
@@ -34,8 +38,12 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 # tests: cmake --build build && ctest --test-dir build --output-on-failure
+# Only wanted when developing: -DVTWEATHER_TESTS=OFF skips the test programs (and the map
+# maker), which makes the build a good deal shorter, for example on a Raspberry Pi.
+option(VTWEATHER_TESTS "Build the test programs and the map maker" ON)
+if(VTWEATHER_TESTS)
 enable_testing()
-add_executable(vtweather_tests tests/tests.cpp src/settings.cpp src/view.cpp src/request_policy.cpp src/radar_scheduler.cpp src/radar_cache.cpp src/radar_frame.cpp src/png.cpp src/inflate.cpp src/input.cpp src/keys.cpp src/prompt.cpp src/basemap.cpp)
+add_executable(vtweather_teststests/tests.cpp src/settings.cpp src/view.cpp src/request_policy.cpp src/radar_scheduler.cpp src/radar_cache.cpp src/radar_frame.cpp src/png.cpp src/inflate.cpp src/input.cpp src/keys.cpp src/prompt.cpp src/basemap.cpp)
 target_include_directories(vtweather_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(vtweather_tests PRIVATE nlohmann_json::nlohmann_json)
 add_test(NAME vtweather_tests COMMAND vtweather_tests)
@@ -113,3 +121,4 @@ add_test(NAME vtweather_prompt_tests COMMAND vtweather_prompt_tests)
 add_executable(vtweather_library_tests tests/library_tests.cpp)
 target_include_directories(vtweather_library_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 add_test(NAME vtweather_library_tests COMMAND vtweather_library_tests)
+endif()  # VTWEATHER_TESTS
