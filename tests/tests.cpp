@@ -126,8 +126,22 @@ void view_tests() {
     {
         View v = make_view(0, 0, 80);
         v.set_centre({95, 190});
-        CHECK_NEAR(v.centre().lat, vtw::MAX_LATITUDE, 1e-9);
+        CHECK_NEAR(v.centre().lat, vtw::MAX_CENTRE_LATITUDE, 1e-9);
+
         CHECK_NEAR(v.centre().lon, -170, 1e-9);
+        View w = make_view(0, 0, 80);
+        // panning north stops at the limit, however long the key is held; so does going south
+        w.set_centre({70, 0});
+        for (int i = 0; i < 400; i++) w.pan_cells(0, -3);
+        CHECK_NEAR(w.centre().lat, vtw::MAX_CENTRE_LATITUDE, 1e-6);
+        w.set_centre({-70, 0});
+        for (int i = 0; i < 400; i++) w.pan_cells(0, 3);
+        CHECK_NEAR(w.centre().lat, -vtw::MAX_CENTRE_LATITUDE, 1e-6);
+        // and at the limit, the widest zoom still shows less than the whole width of the earth
+        w.set_centre({95, 0});
+        w.set_zoom_km(vtw::MAX_KM_ACROSS);
+        w.set_size(170, 50);
+        CHECK(w.box().east - w.box().west < 360);
     }
 }
 
@@ -177,7 +191,7 @@ void settings_tests() {
     notes.clear();
     s = vtw::load_settings(write_file("vtw_range.json",
         R"({"location":{"lat":120,"lon":500},"zoom_km":1,"cell_aspect":9,"refresh_minutes":1})"), notes);
-    CHECK_NEAR(s.home.lat, vtw::MAX_LATITUDE, 1e-12);
+    CHECK_NEAR(s.home.lat, vtw::MAX_CENTRE_LATITUDE, 1e-12);
     CHECK_NEAR(s.home.lon, 180, 1e-12);
     CHECK_NEAR(s.zoom_km, vtw::MIN_KM_ACROSS, 1e-12);
     CHECK_NEAR(s.cell_aspect, 3.0, 1e-12);

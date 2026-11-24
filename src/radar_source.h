@@ -15,6 +15,16 @@ constexpr double RADAR_KM_PER_PIXEL = 1.0;
 constexpr int MIN_PICTURE_SIDE = 64;
 constexpr int MAX_PICTURE_SIDE = 1500;         // keeps the answer small, however far out the view is
 
+// The area the radar covers: the continental United States and a margin (the service's own
+// layer). Anywhere else a request would only bring back an empty picture.
+constexpr GeoBox RADAR_COVERAGE{20.0, -130.0, 55.0, -60.0};
+
+// The box cut to the real earth (latitude -90..90, longitude -180..180).
+GeoBox clip_to_earth(const GeoBox& box);
+
+// The area two boxes share, in out; false if they share none worth a picture.
+bool intersect(const GeoBox& a, const GeoBox& b, GeoBox& out);
+
 // How many pixels wide and high a picture of this area should be: about one per kilometre,
 // within the limits above.
 void radar_picture_size(const GeoBox& box, int& width, int& height);

@@ -37,7 +37,7 @@ void View::set_size(int cols, int rows) {
 }
 
 void View::set_centre(GeoPoint centre) {
-    centre.lat = std::min(std::max(centre.lat, -MAX_LATITUDE), MAX_LATITUDE);
+    centre.lat = std::min(std::max(centre.lat, -MAX_CENTRE_LATITUDE), MAX_CENTRE_LATITUDE);
     centre.lon = std::remainder(centre.lon, 360.0);        // wrap into -180..180
     centre_ = centre;
     refresh();

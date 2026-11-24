@@ -35,7 +35,7 @@ it: the notes on screen say what was wrong and what was used instead.
 
 | setting | meaning |
 |---|---|
-| `location` | `name`, `lat`, `lon`: where the map is centred, in degrees (north and east positive) |
+| `location` | `name`, `lat`, `lon`: where the map is centred, in degrees (north and east positive; the latitude is limited to 80 either way) |
 | `zoom_km` | the ground distance across the screen, 2 to 6000 km |
 | `cell_aspect` | how many times taller than wide a terminal cell is, 1 to 3 (2.0 suits most) |
 | `refresh_minutes` | how often to ask for new radar, never less than 5: the radar updates about that often and the data comes from a free service |
@@ -164,6 +164,15 @@ orange, red, magenta. The line at the top left says how the radar is doing. Norm
 own scan ("radar: scan 05:18 (11:18Z), 1 min old": local time, then UTC), and marks the picture
 "(old)" when it is older than the refresh time; otherwise it says it is asking, or why an update failed
 and when it will try again.
+
+## Where the radar covers
+
+NOAA's radar covers the continental United States and a margin, 20 to 55 degrees north and 130 to 60
+degrees west. The program asks for a picture of only the part of the view inside that area (so a
+picture is never labelled with more than it shows), and nothing at all when the view is wholly outside
+it; the line at the top then says "radar: none here". The view cannot be centred nearer than 80
+degrees to a pole: the map is the usual web map (Mercator), which stretches without limit toward the
+poles, so that near them a screen wider than the earth would show the world repeated.
 
 ## The radar's scan time
 

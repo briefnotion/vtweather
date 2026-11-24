@@ -43,6 +43,27 @@ bool wait_for(vtw::RadarWorker& worker, vtw::RadarResult& result, double seconds
     return false;
 }
 
+void box_tests() {
+    // cut to the earth
+    const vtw::GeoBox over = vtw::clip_to_earth(vtw::GeoBox{-95, -571, 120, 355});
+    CHECK(over.south == -90 && over.north == 90 && over.west == -180 && over.east == 180);
+    const vtw::GeoBox inside = vtw::clip_to_earth(vtw::GeoBox{10, -20, 30, 40});
+    CHECK(inside.south == 10 && inside.west == -20 && inside.north == 30 && inside.east == 40);
+    // what two boxes share
+    vtw::GeoBox out;
+    CHECK(vtw::intersect({0, 0, 10, 10}, {5, 5, 15, 15}, out) && out.south == 5 && out.west == 5 && out.north == 10 && out.east == 10);
+    CHECK(vtw::intersect({0, 0, 10, 10}, {2, 2, 3, 3}, out) && out.north == 3);                     // one inside the other
+    CHECK(!vtw::intersect({0, 0, 10, 10}, {20, 20, 30, 30}, out));                                  // apart
+    CHECK(!vtw::intersect({0, 0, 10, 10}, {10, 0, 20, 10}, out));                                   // touching only
+    // the radar's area, and a view of the whole US inside it
+    CHECK(vtw::RADAR_COVERAGE.south == 20 && vtw::RADAR_COVERAGE.north == 55);
+    CHECK(vtw::intersect({-90, -180, 90, 180}, vtw::RADAR_COVERAGE, out) && out.west == -130 && out.east == -60);
+    // the address asks for exactly the clipped box: what the picture shows is what it is labelled with
+    const vtw::GeoBox huge{-67.84, -571.7, 89.96, 355.9};
+    const std::string url = vtw::radar_url(huge);
+    CHECK(url.find("bbox=-180.00000,-67.84000,180.00000,89.96000") != std::string::npos);
+}
+
 void source_tests() {
     // the address of a picture of the Seattle area
     const std::string url = vtw::radar_url(SEATTLE);
@@ -246,6 +267,7 @@ void worker_tests() {
 }  // namespace
 
 int main() {
+    box_tests();
     source_tests();
     scan_time_tests();
     worker_tests();

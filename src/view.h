@@ -26,7 +26,9 @@ struct GeoBox {
     double south = 0, west = 0, north = 0, east = 0;     // degrees
 };
 
-constexpr double MAX_LATITUDE = 85.0;       // Mercator cannot show the poles
+constexpr double MAX_LATITUDE = 85.0;       // Mercator cannot show the poles: nothing is projected beyond this
+constexpr double MAX_CENTRE_LATITUDE = 80.0;   // and the view cannot be centred nearer than this: up there the map
+                                               // stretches so far that a screen wider than the earth would show the world repeated
 constexpr double MIN_KM_ACROSS = 2.0;       // the closest zoom
 constexpr double MAX_KM_ACROSS = 6000.0;    // the widest zoom
 

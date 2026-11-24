@@ -3,7 +3,9 @@
 // Nothing goes to the internet.
 #include <chrono>
 #include <filesystem>
+#include <random>
 #include <string>
+#include <vector>
 #include <thread>
 #include <unistd.h>
 
@@ -11,6 +13,7 @@
 #include "test_server.h"
 
 #include "../src/radar_feed.h"
+#include "../src/radar_source.h"
 
 #ifndef VTW_TEST_DATA_DIR
 #error "VTW_TEST_DATA_DIR must name the tests/data folder"
@@ -161,6 +164,122 @@ void tests() {
     }
 }
 
+// the radar covers only part of the earth: nothing is asked for outside it, and what is asked for is
+// exactly the part of the view inside it
+void coverage_tests() {
+    namespace fs = std::filesystem;
+    TestServer server(VTW_TEST_DATA_DIR);
+    std::vector<vtw::GeoBox> asked;                                          // every area the feed asked a picture of
+    auto url = [&](const vtw::GeoBox& area) { asked.push_back(area); return server.url("/png/noaa_seattle_rain"); };
+    auto make = [](double lat, double lon, double km, int cols = 120, int rows = 40) {
+        vtw::View v;
+        v.set_cell_aspect(2.0);
+        v.set_centre({lat, lon});
+        v.set_zoom_km(km);
+        v.set_size(cols, rows);
+        return v;
+    };
+    auto inside_radar = [](const vtw::GeoBox& b) {
+        return b.south >= vtw::RADAR_COVERAGE.south && b.north <= vtw::RADAR_COVERAGE.north &&
+               b.west >= vtw::RADAR_COVERAGE.west && b.east <= vtw::RADAR_COVERAGE.east;
+    };
+
+    // near the north pole (the view that once broke it): nothing is asked for, and it says why. (At the
+    // widest zoom the bottom of such a screen still reaches down into the radar's area: Mercator
+    // stretches the north so much; that case is below.)
+    {
+        vtw::RadarFeed feed(quick_settings(), 300, url);
+        for (double km : {1500.0, 600.0, 50.0}) {
+            const vtw::View pole = make(85, -107.9, km);                       // the view clamps the centre to 80
+            double t = 0;
+            for (int i = 0; i < 100; i++) { feed.update(pole, t); t += 1; }
+            CHECK(feed.outside_coverage() && !feed.has_frame());
+            CHECK(has(feed.status(t), "none here"));
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        CHECK(server.requests() == 0 && asked.empty());
+    }
+    // a view that only just reaches the radar's area: the area asked for is inside it, and the picture is
+    // labelled with that same area (so it can never claim more than it shows); a refresh is not asked for
+    // again and again because the view extends past the edge
+    {
+        asked.clear();
+        vtw::RadarFeed feed(quick_settings(), 300, url);
+        const vtw::View edge = make(57, -62, 800);                              // mostly north-east of the radar
+        double t = 0;
+        CHECK(wait_for_status(feed, edge, t, "just fetched"));
+        CHECK(asked.size() == 1 && inside_radar(asked[0]));
+        CHECK(feed.has_frame() && inside_radar(feed.frame().box));
+        CHECK(feed.frame().box.north == asked[0].north && feed.frame().box.west == asked[0].west);
+        const int requests = server.requests();
+        for (t = t + 1; t < 200; t += 1) feed.update(edge, t);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        CHECK(server.requests() == requests);
+    }
+    // the whole country, and further out than the radar sees: still one picture, inside the radar's area
+    {
+        asked.clear();
+        vtw::RadarFeed feed(quick_settings(), 300, url);
+        const vtw::View wide = make(40, -95, 6000);
+        double t = 0;
+        CHECK(wait_for_status(feed, wide, t, "just fetched"));
+        CHECK(asked.size() == 1 && inside_radar(asked[0]));
+        const int requests = server.requests();
+        for (t = t + 1; t < 200; t += 1) feed.update(wide, t);
+        CHECK(server.requests() == requests);
+        // out over the open Pacific: nothing asked, and the picture is still there for when you come back
+        const vtw::View sea = make(10, -170, 400);
+        feed.update(sea, t);
+        CHECK(feed.outside_coverage() && has(feed.status(t), "none here"));
+        feed.update(wide, t + 1);
+        CHECK(!feed.outside_coverage() && feed.has_frame());
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        CHECK(server.requests() == requests);
+    }
+    // the view that once broke it, at the widest zoom near the pole: the bottom of the screen reaches the radar's
+    // area, and what is asked for is only that part
+    {
+        asked.clear();
+        vtw::RadarFeed feed(quick_settings(), 300, url);
+        const vtw::View pole = make(85, -107.9, 6000);
+        double t = 0;
+        CHECK(wait_for_status(feed, pole, t, "just fetched"));
+        CHECK(asked.size() == 1 && inside_radar(asked[0]));
+        CHECK(inside_radar(feed.frame().box));
+        const int requests = server.requests();
+        for (t = t + 1; t < 200; t += 1) feed.update(pole, t);
+        CHECK(server.requests() == requests);
+    }
+    // random views anywhere on the earth: every area asked for is inside the radar's
+    {
+        asked.clear();
+        std::mt19937 rng(7);
+        for (int round = 0; round < 40; round++) {
+            vtw::RadarFeed feed(quick_settings(), 300, url);
+            const vtw::View v = make(-85 + (rng() % 1700) / 10.0, -180 + (rng() % 3600) / 10.0, std::exp(std::log(2.0) + std::log(3000.0) * (rng() % 1000) / 1000.0));
+            double t = 0;
+            for (int i = 0; i < 3; i++) { feed.update(v, t); t += 0.05; std::this_thread::sleep_for(std::chrono::milliseconds(5)); }
+        }
+        for (const vtw::GeoBox& a : asked) CHECK(inside_radar(a));
+    }
+    // a picture saved by an older version that claims an area outside the radar's is not used
+    {
+        const std::string folder = (fs::temp_directory_path() / ("vtw_feed_bad_" + std::to_string(getpid()))).string();
+        fs::remove_all(folder);
+        vtw::RadarStore store(folder);
+        vtw::RadarFrame bad;
+        bad.box = {-67.84, -571.7, 89.96, 355.9};                              // what the pole once produced
+        bad.width = 2; bad.height = 2;
+        bad.dbz = {1, 2, 3, 4};
+        std::string error;
+        CHECK(store.save(bad, 1800000000, 0, error));
+        vtw::RadarFeed feed(quick_settings(), 300, url, &store, 1800000030);
+        feed.update(make(40, -95, 6000), 0);
+        CHECK(!feed.has_frame());                                              // not taken for a picture of anything
+        fs::remove_all(folder);
+    }
+}
+
 // the real scan time in the status line, and kept with the picture
 void scan_status_tests() {
     namespace fs = std::filesystem;
@@ -266,6 +385,7 @@ void store_tests() {
 
 int main() {
     tests();
+    coverage_tests();
     scan_status_tests();
     store_tests();
     if (failures == 0) std::printf("all radar feed tests passed\n");

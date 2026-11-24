@@ -12,7 +12,16 @@ namespace {
 constexpr double PI = 3.14159265358979323846;
 constexpr double KM_PER_DEGREE = 111.195;          // along a meridian
 
-GeoBox clipped(GeoBox b) {
+GeoBox clipped(const GeoBox& b) { return clip_to_earth(b); }
+
+int side(double km) {
+    return std::min(std::max((int)std::lround(km / RADAR_KM_PER_PIXEL), MIN_PICTURE_SIDE), MAX_PICTURE_SIDE);
+}
+
+}  // namespace
+
+GeoBox clip_to_earth(const GeoBox& box) {
+    GeoBox b = box;
     b.south = std::min(std::max(b.south, -90.0), 90.0);
     b.north = std::min(std::max(b.north, -90.0), 90.0);
     b.west = std::min(std::max(b.west, -180.0), 180.0);
@@ -20,11 +29,12 @@ GeoBox clipped(GeoBox b) {
     return b;
 }
 
-int side(double km) {
-    return std::min(std::max((int)std::lround(km / RADAR_KM_PER_PIXEL), MIN_PICTURE_SIDE), MAX_PICTURE_SIDE);
+bool intersect(const GeoBox& a, const GeoBox& b, GeoBox& out) {
+    GeoBox r{std::max(a.south, b.south), std::max(a.west, b.west), std::min(a.north, b.north), std::min(a.east, b.east)};
+    if (!(r.north - r.south > 1e-6) || !(r.east - r.west > 1e-6)) return false;
+    out = r;
+    return true;
 }
-
-}  // namespace
 
 void radar_picture_size(const GeoBox& box, int& width, int& height) {
     const GeoBox b = clipped(box);

@@ -46,6 +46,7 @@ public:
     size_t cached_pictures() const { return cache_.size(); }
     std::string status(double now) const;
     bool failing() const { return !error_.empty(); }       // the latest attempt did not work
+    bool outside_coverage() const { return outside_; }     // the view is nowhere near the radar's area
 
 private:
     UrlBuilder url_for_;
@@ -60,6 +61,7 @@ private:
     RadarStore* store_;
     double unix_at_start_;
     bool offline_ = false;
+    bool outside_ = false;
     std::string error_;
 };
 
