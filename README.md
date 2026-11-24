@@ -172,6 +172,14 @@ change letter about ten times a second). The two kinds of border (state and coun
 layer, and so do the two kinds of road; the land and the water are the ground the layers sit on and
 are not layers. The order the layers are drawn in makes no difference.
 
+A cell with one layer has a shimmer of 0, and the vtscreen library shows a shimmer of 0 as the first
+letter of the cell's brightness group, the same in every such cell, so a river, a road or a border is
+a clean line of one letter and an overlap, whose letters vary, stands out against it. Without colour
+the kinds therefore differ by that letter: `:` for the grid, rivers and the other roads, `=` for
+state borders and highways, `i` for country borders, `o` for the coast and the faintest rain, and
+heavier rain through `0` and `#` up to solid blocks. (Rivers, other roads and the grid share a
+brightness step, so they share a letter; so do state borders and highways. Colour tells them apart.)
+
 ## Seeing the rain
 
 The program draws the area in `settings.json` (the sample is Wichita, Kansas). To look at weather

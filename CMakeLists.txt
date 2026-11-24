@@ -108,3 +108,8 @@ add_executable(vtweather_prompt_tests tests/prompt_tests.cpp src/keys.cpp src/pr
 target_include_directories(vtweather_prompt_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_definitions(vtweather_prompt_tests PRIVATE VTW_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
 add_test(NAME vtweather_prompt_tests COMMAND vtweather_prompt_tests)
+
+# the part of the vtscreen library vtweather leans on: how a cell's shimmer picks its letter
+add_executable(vtweather_library_tests tests/library_tests.cpp)
+target_include_directories(vtweather_library_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+add_test(NAME vtweather_library_tests COMMAND vtweather_library_tests)
