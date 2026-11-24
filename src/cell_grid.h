@@ -3,6 +3,7 @@
 // instead of each asking the View for every corner again.
 #pragma once
 
+#include <cstddef>
 #include <vector>
 
 #include "view.h"
