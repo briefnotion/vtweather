@@ -3,12 +3,13 @@
 An overhead map of where you are, zoomable, with the real-time rain on it, drawn as
 letters in a terminal. Built on [vtscreen](https://github.com/briefnotion/vtscreen).
 
-**Status:** it works end to end, in a first form. It reads its settings, asks NOAA's radar service
-for a picture of the area on screen (in the background, so the screen never waits), turns the
-colours into rain strengths and draws the rain as letters on top of a graticule and a marker that
-stand in for the map. You can zoom and move around with the keys. It follows the window being
-resized, and fetches again every few minutes and when the view moves off the picture. Not yet: a
-base map (coastlines and so on), the animated loop of the last hour or two, alerts.
+**Status:** it works end to end, in a first form. It reads its settings, draws the land and water
+(a base map made from Natural Earth data), asks NOAA's radar service for a picture of the area on
+screen (in the background, so the screen never waits), turns the colours into rain strengths and
+draws the rain as letters on top. You can zoom and move around with the keys. It follows the window
+being resized, and fetches the radar again every few minutes and when the view moves off the
+picture. Not yet: rivers, borders and place names on the map, the animated loop of the last hour or
+two, alerts.
 
 ## Build and run
 
@@ -76,12 +77,32 @@ checksum) and refuses anything odd with a reason, since the pictures come off th
 | `-` or `_` | zoom out (the widest is 6000 km) |
 | `w` `a` `s` `d` | move the view up (north), left, down, right, by a tenth of the screen; hold a key to keep moving |
 | `r` | back to the place and zoom in your settings |
+| `g` | show or hide a grid of latitude and longitude lines |
 | `q` | quit |
 
 Moving or zooming out onto an area the radar picture does not cover makes the program ask for a new
 one, but only after you have stayed there for a second, so holding a key does not send a request
 for every press. Zooming in never needs a new picture: the radar's own detail is about 1 km.
 `--offline` asks the radar service for nothing at all, which is handy for trying the keys.
+
+## The base map
+
+The ground is drawn from `data/basemap.bin`, a compact file of land and lake polygons that the
+program reads itself (`src/basemap.cpp`). It was made from [Natural Earth](https://www.naturalearthdata.com)
+(public domain) at three levels of detail, about 1:110 million for views of thousands of
+kilometres, 1:50 million for hundreds and 1:10 million for close views; the finest level covers
+North America only, since that is all the radar covers, and elsewhere a close view uses the next
+level. Water is a dark blue background, land a dark green one with faint dots, and the coast a
+brighter line, all kept dim so the rain stands out; without colour water is blank, land is faint
+dots and the coast is a brighter line. The ground of a view is worked out again only when the view
+changes. The file is found in `data/` of the folder you run from, or `../data/`, or the source tree
+it was built from; `--basemap FILE` names another. Without one the program still runs, with no
+ground.
+
+To remake the file (only needed if the map data changes):
+
+    ./tools/get_natural_earth.sh                          downloads the GeoJSON, once, politely
+    ./build/make_basemap tools/natural_earth data/basemap.bin
 
 ## Seeing the rain
 
@@ -126,7 +147,8 @@ picture of heavy rain.
 They cover the View (scale, cell shape, north up, rotation, round trips, pan, zoom), the settings
 loader (good, missing, damaged, wrong type, out of range), the request policy (with a made-up
 clock), the fetcher (pacing, backoff, the hourly limit, timeouts, size limit, cancelling), the
-PNG reader, the colour scale and the worker thread. The fetch tests talk to a small server on your own machine; nothing goes to the
+PNG reader, the colour scale, the worker thread, the keys and the base map (its file format, the
+ring simplifier, filling land and water into cells, and known places on the real file). The fetch tests talk to a small server on your own machine; nothing goes to the
 internet.
 
 `tests/data/` holds the PNG test pictures, made by `tests/make_png_fixtures.py` (it needs Pillow,
@@ -138,8 +160,9 @@ under ASan and UBSan is a good idea after any change to the reader. The worker a
 can also be run under ThreadSanitizer (`-fsanitize=thread`; if it stops with "unexpected memory
 mapping", start the program with `setarch x86_64 -R`).
 
-## Third-party code
+## Third-party code and data
 
+- [Natural Earth](https://www.naturalearthdata.com) (public domain): the land and lake shapes in `data/basemap.bin`.
 - [vtscreen](https://github.com/briefnotion/vtscreen) (MIT), the drawing library, in `vtscreen/`.
 - [nlohmann/json](https://github.com/nlohmann/json) (MIT), in `third_party/json/`, pinned to
   release v3.12.0.

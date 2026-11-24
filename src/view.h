@@ -42,6 +42,8 @@ public:
     int rows() const { return rows_; }
     GeoPoint centre() const { return centre_; }
     double zoom_km() const { return km_across_; }
+    double cell_aspect() const { return aspect_; }
+    double heading() const { return heading_deg_; }
     double km_per_col() const { return km_across_ / cols_; }      // at the centre
 
     GeoPoint at(double col, double row) const;                    // the earth under a position

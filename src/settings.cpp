@@ -82,9 +82,9 @@ Settings load_settings(const std::string& path, std::string& notes) {
     return settings;
 }
 
-std::string take_settings_option(int& argc, char** argv) {
+std::string take_settings_option(int& argc, char** argv, const char* option) {
     for (int i = 1; i + 1 < argc; i++) {
-        if (std::string(argv[i]) != "--settings") continue;
+        if (std::string(argv[i]) != option) continue;
         const std::string path = argv[i + 1];
         for (int j = i; j + 2 < argc; j++) argv[j] = argv[j + 2];
         argc -= 2;

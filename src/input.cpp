@@ -11,11 +11,12 @@ Command command_for_key(char key) {
         case 'w': case 'W': return Command::PanUp;
         case 's': case 'S': return Command::PanDown;
         case 'r': case 'R': return Command::Reset;
+        case 'g': case 'G': return Command::ToggleGraticule;
         default: return Command::None;
     }
 }
 
-void apply_command(Command command, View& view, const Settings& settings) {
+void apply_command(Command command, View& view, const Settings& settings, UiState& ui) {
     switch (command) {
         case Command::ZoomIn: view.zoom(ZOOM_STEP); break;
         case Command::ZoomOut: view.zoom(1 / ZOOM_STEP); break;
@@ -27,6 +28,7 @@ void apply_command(Command command, View& view, const Settings& settings) {
             view.set_centre(settings.home);
             view.set_zoom_km(settings.zoom_km);
             break;
+        case Command::ToggleGraticule: ui.graticule = !ui.graticule; break;
         case Command::None: break;
     }
 }

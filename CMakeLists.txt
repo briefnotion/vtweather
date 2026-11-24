@@ -19,12 +19,14 @@ find_package(CURL REQUIRED)                 # fetching from the web (libcurl, an
 find_package(Threads REQUIRED)
 
 set(VTWEATHER_SOURCES src/settings.cpp src/view.cpp src/draw_grid.cpp src/request_policy.cpp src/fetch.cpp src/inflate.cpp src/png.cpp src/radar_frame.cpp src/radar_source.cpp src/radar_worker.cpp
-    src/radar_scheduler.cpp src/radar_feed.cpp src/cell_grid.cpp src/draw_radar.cpp src/input.cpp)
+    src/radar_scheduler.cpp src/radar_feed.cpp src/cell_grid.cpp src/draw_radar.cpp src/input.cpp src/basemap.cpp src/ground_map.cpp src/draw_ground.cpp)
 
 set(VTWEATHER_SOURCES_NO_MAIN ${VTWEATHER_SOURCES})
 add_executable(vtweather src/main.cpp ${VTWEATHER_SOURCES})
 # the root is an include path, so sources say #include "vtscreen/vtscreen.h"
 target_include_directories(vtweather PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+# where to look for data/basemap.bin when it is not in the folder you run from
+target_compile_definitions(vtweather PRIVATE VTW_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(vtweather PRIVATE nlohmann_json::nlohmann_json CURL::libcurl Threads::Threads)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(vtweather PRIVATE -Wall -Wextra)
@@ -76,3 +78,14 @@ target_include_directories(vtweather_feed_tests PRIVATE "${CMAKE_CURRENT_SOURCE_
 target_compile_definitions(vtweather_feed_tests PRIVATE VTW_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
 target_link_libraries(vtweather_feed_tests PRIVATE nlohmann_json::nlohmann_json CURL::libcurl Threads::Threads)
 add_test(NAME vtweather_feed_tests COMMAND vtweather_feed_tests)
+
+# the map maker: turns Natural Earth's GeoJSON into data/basemap.bin (see tools/get_natural_earth.sh)
+add_executable(make_basemap tools/make_basemap.cpp src/basemap.cpp)
+target_include_directories(make_basemap PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(make_basemap PRIVATE nlohmann_json::nlohmann_json)
+
+# the base map: the file, the simplifier, filling cells, and known places on the real data
+add_executable(vtweather_ground_tests tests/ground_tests.cpp src/basemap.cpp src/ground_map.cpp src/view.cpp)
+target_include_directories(vtweather_ground_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_definitions(vtweather_ground_tests PRIVATE VTW_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
+add_test(NAME vtweather_ground_tests COMMAND vtweather_ground_tests)

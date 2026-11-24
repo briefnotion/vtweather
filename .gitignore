@@ -3,3 +3,6 @@ build/
 
 # your own settings (a place name and coordinates): never committed, see settings.sample.json
 settings.json
+
+# the Natural Earth files the base map is made from (see tools/get_natural_earth.sh)
+tools/natural_earth/

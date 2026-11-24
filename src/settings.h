@@ -30,9 +30,9 @@ struct Settings {
 // described in notes, one line each, and the default or the nearest allowed value is used.
 Settings load_settings(const std::string& path, std::string& notes);
 
-// Find "--settings PATH" in the command line, remove it from argv (so the library's own
+// Find an option such as "--settings PATH" in the command line, remove it from argv (so the library's own
 // option reader does not see it) and return the path, or "" if it was not given.
-std::string take_settings_option(int& argc, char** argv);
+std::string take_settings_option(int& argc, char** argv, const char* option = "--settings");
 
 // Find a flag such as "--offline" in the command line, remove it from argv and say whether it
 // was there.

@@ -365,43 +365,45 @@ void input_tests() {
     CHECK(vtw::command_for_key('w') == Command::PanUp && vtw::command_for_key('W') == Command::PanUp);
     CHECK(vtw::command_for_key('s') == Command::PanDown && vtw::command_for_key('a') == Command::PanLeft);
     CHECK(vtw::command_for_key('d') == Command::PanRight && vtw::command_for_key('r') == Command::Reset);
+    CHECK(vtw::command_for_key('g') == Command::ToggleGraticule);
     CHECK(vtw::command_for_key('x') == Command::None && vtw::command_for_key('\n') == Command::None);
 
     vtw::Settings settings;                                   // Wichita, 80 km
+    vtw::UiState ui;
     View view = make_view(settings.home.lat, settings.home.lon, settings.zoom_km, 100, 30);
 
     // zoom: a step in shows 80 % of the distance, a step out undoes it
-    vtw::apply_command(Command::ZoomIn, view, settings);
+    vtw::apply_command(Command::ZoomIn, view, settings, ui);
     CHECK_NEAR(view.zoom_km(), 64, 1e-9);
-    vtw::apply_command(Command::ZoomOut, view, settings);
+    vtw::apply_command(Command::ZoomOut, view, settings, ui);
     CHECK_NEAR(view.zoom_km(), 80, 1e-9);
-    for (int i = 0; i < 60; i++) vtw::apply_command(Command::ZoomIn, view, settings);
+    for (int i = 0; i < 60; i++) vtw::apply_command(Command::ZoomIn, view, settings, ui);
     CHECK_NEAR(view.zoom_km(), vtw::MIN_KM_ACROSS, 1e-9);     // stops at the closest zoom
-    for (int i = 0; i < 80; i++) vtw::apply_command(Command::ZoomOut, view, settings);
+    for (int i = 0; i < 80; i++) vtw::apply_command(Command::ZoomOut, view, settings, ui);
     CHECK_NEAR(view.zoom_km(), vtw::MAX_KM_ACROSS, 1e-9);     // and the widest
 
     // pan: a tenth of the screen; d looks east, w looks north, and the screen follows
     view = make_view(settings.home.lat, settings.home.lon, settings.zoom_km, 100, 30);
-    vtw::apply_command(Command::PanRight, view, settings);
+    vtw::apply_command(Command::PanRight, view, settings, ui);
     CHECK(view.centre().lon > settings.home.lon);
     CHECK_NEAR(view.centre().lat, settings.home.lat, 1e-9);
     double col, row;
     view.to_cell(settings.home, col, row);
     CHECK_NEAR(col, 50 - 10, 1e-6);                           // home is 10 columns left of the middle now
-    vtw::apply_command(Command::PanLeft, view, settings);
+    vtw::apply_command(Command::PanLeft, view, settings, ui);
     CHECK_NEAR(view.centre().lon, settings.home.lon, 1e-9);
-    vtw::apply_command(Command::PanUp, view, settings);
+    vtw::apply_command(Command::PanUp, view, settings, ui);
     CHECK(view.centre().lat > settings.home.lat);
     view.to_cell(settings.home, col, row);
     CHECK_NEAR(row, 15 + 3, 0.01);                            // 3 rows (a tenth of 30) down from the middle (the scale shifts a hair with latitude)
-    vtw::apply_command(Command::PanDown, view, settings);
-    vtw::apply_command(Command::PanDown, view, settings);
+    vtw::apply_command(Command::PanDown, view, settings, ui);
+    vtw::apply_command(Command::PanDown, view, settings, ui);
     CHECK(view.centre().lat < settings.home.lat);
 
     // reset goes back to the settings' place and zoom
-    vtw::apply_command(Command::ZoomIn, view, settings);
-    vtw::apply_command(Command::PanRight, view, settings);
-    vtw::apply_command(Command::Reset, view, settings);
+    vtw::apply_command(Command::ZoomIn, view, settings, ui);
+    vtw::apply_command(Command::PanRight, view, settings, ui);
+    vtw::apply_command(Command::Reset, view, settings, ui);
     CHECK_NEAR(view.centre().lat, settings.home.lat, 1e-9);
     CHECK_NEAR(view.centre().lon, settings.home.lon, 1e-9);
     CHECK_NEAR(view.zoom_km(), settings.zoom_km, 1e-9);
@@ -409,10 +411,17 @@ void input_tests() {
     // the pan step is the same fraction of the screen at any zoom, so it covers more ground when zoomed out
     View near = make_view(37.69, -97.34, 10, 100, 30), far = make_view(37.69, -97.34, 1000, 100, 30);
     const GeoPoint n0 = near.centre(), f0 = far.centre();
-    vtw::apply_command(Command::PanRight, near, settings);
-    vtw::apply_command(Command::PanRight, far, settings);
+    vtw::apply_command(Command::PanRight, near, settings, ui);
+    vtw::apply_command(Command::PanRight, far, settings, ui);
     CHECK(vtw::distance_km(f0, far.centre()) > 50 * vtw::distance_km(n0, near.centre()));
     CHECK_NEAR(vtw::distance_km(n0, near.centre()), 1.0, 0.05);       // a tenth of 10 km
+
+    // g shows and hides the grid
+    CHECK(!ui.graticule);
+    vtw::apply_command(Command::ToggleGraticule, view, settings, ui);
+    CHECK(ui.graticule);
+    vtw::apply_command(Command::ToggleGraticule, view, settings, ui);
+    CHECK(!ui.graticule);
 
     // --offline and other flags are taken out of the command line
     {

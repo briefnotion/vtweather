@@ -6,6 +6,7 @@
 //   +  =        zoom in            -  _        zoom out
 //   w  a  s  d  pan up, left, down, right (the map moves under you: w looks further north)
 //   r           back to the place and zoom in the settings
+//   g           show or hide the grid of latitude and longitude lines
 #pragma once
 
 #include "settings.h"
@@ -13,13 +14,18 @@
 
 namespace vtw {
 
-enum class Command { None, ZoomIn, ZoomOut, PanLeft, PanRight, PanUp, PanDown, Reset };
+enum class Command { None, ZoomIn, ZoomOut, PanLeft, PanRight, PanUp, PanDown, Reset, ToggleGraticule };
+
+// What is shown, apart from where the view is.
+struct UiState {
+    bool graticule = false;
+};
 
 constexpr double ZOOM_STEP = 0.8;          // one press shows 80 % of the distance (zooms in)
 constexpr double PAN_STEP = 0.10;          // one press moves a tenth of the screen
 
 Command command_for_key(char key);
 
-void apply_command(Command command, View& view, const Settings& settings);
+void apply_command(Command command, View& view, const Settings& settings, UiState& ui);
 
 }  // namespace vtw

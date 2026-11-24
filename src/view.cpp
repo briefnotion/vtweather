@@ -15,8 +15,9 @@ double degrees(double rad) { return rad * 180.0 / PI; }
 
 // latitude, longitude -> Mercator metres
 void project(GeoPoint p, double& x, double& y) {
+    const double lat = std::min(std::max(p.lat, -MAX_LATITUDE), MAX_LATITUDE);   // the poles are infinitely far
     x = EARTH_RADIUS_M * radians(p.lon);
-    y = EARTH_RADIUS_M * std::log(std::tan(PI / 4 + radians(p.lat) / 2));
+    y = EARTH_RADIUS_M * std::log(std::tan(PI / 4 + radians(lat) / 2));
 }
 
 // Mercator metres -> latitude, longitude

@@ -7,8 +7,8 @@ namespace vtw {
 
 namespace {
 
-constexpr double LINE_BRIGHTNESS = 0.28;
-constexpr double CROSSING_BRIGHTNESS = 0.5;
+constexpr double LINE_BRIGHTNESS = 0.18;
+constexpr double CROSSING_BRIGHTNESS = 0.26;
 constexpr int MIN_CELLS_BETWEEN_LINES = 12;
 
 // 1, 2 or 5 times a power of ten, the smallest that is at least x.
@@ -85,7 +85,7 @@ void draw_readout(const View& view, const Settings& settings, const std::string&
     picture.text(row++, 1, line);
     picture.text(row++, 1, "settings: " + settings.source);
     picture.text(row++, 1, radar_status, 150, 200, 150);
-    picture.text(row++, 1, "+ - zoom   w a s d move   r reset   q quit", 120, 120, 130);
+    picture.text(row++, 1, "+ - zoom   w a s d move   r reset   g grid   q quit", 120, 120, 130);
 
     size_t start = 0;
     while (start < notes.size()) {                           // one amber line per note
