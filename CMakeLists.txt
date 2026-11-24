@@ -18,7 +18,7 @@ add_subdirectory(third_party/json)          # nlohmann_json::nlohmann_json (sett
 find_package(CURL REQUIRED)                 # fetching from the web (libcurl, and its development files)
 find_package(Threads REQUIRED)
 
-set(VTWEATHER_SOURCES src/settings.cpp src/view.cpp src/draw_grid.cpp src/request_policy.cpp src/fetch.cpp src/inflate.cpp src/png.cpp)
+set(VTWEATHER_SOURCES src/settings.cpp src/view.cpp src/draw_grid.cpp src/request_policy.cpp src/fetch.cpp src/inflate.cpp src/png.cpp src/radar_frame.cpp)
 
 add_executable(vtweather src/main.cpp ${VTWEATHER_SOURCES})
 # the root is an include path, so sources say #include "vtscreen/vtscreen.h"
@@ -47,3 +47,9 @@ add_executable(vtweather_png_tests tests/png_tests.cpp src/png.cpp src/inflate.c
 target_include_directories(vtweather_png_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_definitions(vtweather_png_tests PRIVATE VTW_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
 add_test(NAME vtweather_png_tests COMMAND vtweather_png_tests)
+
+# colours to strengths: the scale, and looking a frame up by place
+add_executable(vtweather_radar_frame_tests tests/radar_frame_tests.cpp src/radar_frame.cpp src/png.cpp src/inflate.cpp)
+target_include_directories(vtweather_radar_frame_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_definitions(vtweather_radar_frame_tests PRIVATE VTW_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
+add_test(NAME vtweather_radar_frame_tests COMMAND vtweather_radar_frame_tests)

@@ -5,7 +5,8 @@ letters in a terminal. Built on [vtscreen](https://github.com/briefnotion/vtscre
 
 **Status:** just started. It reads its settings, has the View that turns places on the earth
 into places on the screen (zoom, pan, cell shape, ready for a rotated map), has a polite web
-fetcher and a PNG reader (neither used by the screen yet), and shows a graticule with a marker as a stand-in for the
+fetcher, a PNG reader and a way of turning radar colours into rain strengths (none of them used
+by the screen yet), and shows a graticule with a marker as a stand-in for the
 map. Planned, in this order: one radar frame at a fixed place, zoom and pan keys,
 a base map, an animated loop of the last hour or two, alerts.
 
@@ -63,6 +64,21 @@ ones, checks everything (the signature, every chunk's checksum, sizes, the compr
 checksum) and refuses anything odd with a reason, since the pictures come off the network. A
 1500 x 1000 picture takes about 40 milliseconds.
 
+## Rain strength
+
+The radar service draws rain in the usual weather-service colours. `src/radar_frame.cpp` holds
+that colour scale as a list of known colours, each with an estimated reflectivity in dBZ, and
+turns every pixel into a strength: 0 for no rain, about 5 for the faintest echoes, 20 to 30 for
+light to moderate rain, 35 and up for heavy rain. The program then works with strengths, never
+colours, so rain can be drawn in colour or in plain letters alike. A screen cell that covers many
+pixels takes the strongest one, so a storm's core is never averaged away.
+
+The values are estimates (the service publishes no table), good for telling light rain from
+heavy, not for measuring. The colours up to dark green were taken from real pictures; the strong
+end (yellow, orange, red and beyond) is the standard scale, and strong colours that are not on
+it are placed by their hue. Known gap: the strongest end has not yet been compared with a real
+picture of heavy rain.
+
 ## Tests
 
     cmake --build build
@@ -70,8 +86,8 @@ checksum) and refuses anything odd with a reason, since the pictures come off th
 
 They cover the View (scale, cell shape, north up, rotation, round trips, pan, zoom), the settings
 loader (good, missing, damaged, wrong type, out of range), the request policy (with a made-up
-clock), the fetcher (pacing, backoff, the hourly limit, timeouts, size limit, cancelling) and the
-PNG reader. The fetch tests talk to a small server on your own machine; nothing goes to the
+clock), the fetcher (pacing, backoff, the hourly limit, timeouts, size limit, cancelling), the
+PNG reader and the colour scale. The fetch tests talk to a small server on your own machine; nothing goes to the
 internet.
 
 `tests/data/` holds the PNG test pictures, made by `tests/make_png_fixtures.py` (it needs Pillow,
