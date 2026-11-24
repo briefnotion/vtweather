@@ -20,7 +20,7 @@ find_package(Threads REQUIRED)
 
 set(VTWEATHER_SOURCES src/settings.cpp src/view.cpp src/draw_grid.cpp src/request_policy.cpp src/fetch.cpp src/inflate.cpp src/png.cpp src/radar_frame.cpp src/radar_source.cpp src/radar_worker.cpp
     src/radar_scheduler.cpp src/radar_cache.cpp src/store.cpp src/radar_feed.cpp src/cell_grid.cpp src/draw_radar.cpp src/input.cpp src/basemap.cpp src/ground_map.cpp src/draw_ground.cpp
-    src/place_labels.cpp src/draw_places.cpp src/keys.cpp src/prompt.cpp)
+    src/place_labels.cpp src/draw_places.cpp src/keys.cpp src/prompt.cpp src/layers.cpp)
 
 set(VTWEATHER_SOURCES_NO_MAIN ${VTWEATHER_SOURCES})
 add_executable(vtweather src/main.cpp ${VTWEATHER_SOURCES})
@@ -69,7 +69,7 @@ add_test(NAME vtweather_worker_tests COMMAND vtweather_worker_tests)
 
 # the cell grid and drawing the rain
 add_executable(vtweather_draw_tests tests/draw_tests.cpp src/cell_grid.cpp src/draw_radar.cpp src/view.cpp
-               src/radar_frame.cpp src/png.cpp src/inflate.cpp src/draw_ground.cpp src/ground_map.cpp src/basemap.cpp)
+               src/radar_frame.cpp src/png.cpp src/inflate.cpp src/draw_ground.cpp src/ground_map.cpp src/basemap.cpp src/layers.cpp)
 target_include_directories(vtweather_draw_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 add_test(NAME vtweather_draw_tests COMMAND vtweather_draw_tests)
 

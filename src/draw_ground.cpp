@@ -23,11 +23,7 @@ constexpr double WATER_SHIMMER = 0.001;
 constexpr int WATER_R = 8, WATER_G = 22, WATER_B = 48;
 
 // Land has no colour of its own and no letters: it is left as it is, showing the terminal's own
-// background. Lines on the land are letters only, with no background colour.
-void set_line(vtscreen::PicCell& cell, double brightness, int r, int g, int b) {
-    cell.lum = brightness;
-    cell.r = r; cell.g = g; cell.b = b;
-}
+// background. Lines on the land are letters only, with no background colour; each kind is a layer.
 
 void set_water(vtscreen::PicCell& cell) {
     cell.lum = WATER_BRIGHTNESS;
@@ -39,27 +35,24 @@ void set_water(vtscreen::PicCell& cell) {
 
 }  // namespace
 
-void draw_ground(const GroundMap& ground, vtscreen::Picture& picture) {
+void draw_ground(const GroundMap& ground, vtscreen::Picture& picture, LayerBlend& blend) {
     for (int row = 0; row < ground.rows(); row++)
         for (int col = 0; col < ground.cols(); col++) {
             vtscreen::PicCell& cell = picture.at(row, col);
             const Ground kind = ground.at(col, row);
             const uint8_t features = ground.features_at(col, row);
-            if (kind == Ground::Water) {
+            if (kind == Ground::Water) {                             // borders, roads and rivers do not run over water
                 set_water(cell);
-            } else if (features & FEATURE_COUNTRY) {                 // borders and rivers show on land and coast
-                set_line(cell, COUNTRY_BRIGHTNESS, 215, 120, 150);
-            } else if (features & FEATURE_STATE) {
-                set_line(cell, STATE_BRIGHTNESS, 150, 120, 175);
-            } else if (kind == Ground::Coast) {
-                set_line(cell, COAST_BRIGHTNESS, 190, 170, 120);
-            } else if (features & FEATURE_HIGHWAY) {
-                set_line(cell, HIGHWAY_BRIGHTNESS, 230, 180, 85);
-            } else if (features & FEATURE_ROAD) {
-                set_line(cell, ROAD_BRIGHTNESS, 165, 135, 80);
-            } else if (features & FEATURE_RIVER) {
-                set_line(cell, RIVER_BRIGHTNESS, 70, 140, 205);
-            }                                                        // plain land: nothing at all
+                continue;
+            }
+            // Every line in the cell is a layer of its own (the two kinds of border, and the two of road, are one
+            // layer each: the brighter kind is the one drawn).
+            if (kind == Ground::Coast) blend.add(row, col, Layer::Coast, COAST_BRIGHTNESS, 190, 170, 120);
+            if (features & FEATURE_COUNTRY) blend.add(row, col, Layer::Border, COUNTRY_BRIGHTNESS, 215, 120, 150);
+            else if (features & FEATURE_STATE) blend.add(row, col, Layer::Border, STATE_BRIGHTNESS, 150, 120, 175);
+            if (features & FEATURE_HIGHWAY) blend.add(row, col, Layer::Road, HIGHWAY_BRIGHTNESS, 230, 180, 85);
+            else if (features & FEATURE_ROAD) blend.add(row, col, Layer::Road, ROAD_BRIGHTNESS, 165, 135, 80);
+            if (features & FEATURE_RIVER) blend.add(row, col, Layer::River, RIVER_BRIGHTNESS, 70, 140, 205);
         }
 }
 

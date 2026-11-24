@@ -9,6 +9,7 @@
 #include "../src/cell_grid.h"
 #include "../src/draw_ground.h"
 #include "../src/draw_radar.h"
+#include "../src/layers.h"
 
 namespace {
 
@@ -39,16 +40,14 @@ void grid_tests() {
 }
 
 void look_tests() {
-    // stronger rain is brighter, always above the map's lines, and shimmers faster
-    double before_brightness = 0, before_shimmer = 0;
+    // stronger rain is brighter, always above the map's lines
+    double before_brightness = 0;
     for (int dbz = 5; dbz <= 75; dbz += 1) {
         const vtw::RainLook look = vtw::rain_look(dbz);
         CHECK(look.brightness >= before_brightness);
         CHECK(look.brightness > 0.30 && look.brightness <= 1.0);
-        CHECK(look.shimmer >= before_shimmer && look.shimmer <= 2.5);
         CHECK(look.r >= 0 && look.r <= 255 && look.g >= 0 && look.g <= 255 && look.b >= 0 && look.b <= 255);
         before_brightness = look.brightness;
-        before_shimmer = look.shimmer;
     }
     CHECK(vtw::rain_look(5).brightness < 0.4);
     CHECK(vtw::rain_look(60).brightness > 0.95);
@@ -81,7 +80,8 @@ void draw_tests() {
 
     vtscreen::Picture picture;
     picture.init(20, 50);
-    vtw::draw_radar(grid, frame, picture);
+    vtw::LayerBlend blend(picture);
+    vtw::draw_radar(grid, frame, blend);
 
     // find where the light and heavy patches landed on the screen
     double light = -1, heavy = -1, core = -1;
@@ -96,7 +96,7 @@ void draw_tests() {
             if (dbz == 62) core = c.lum;
             // a cell with no rain under it is left alone
             if (dbz == 0) CHECK(c.lum == 0);
-            else CHECK_NEAR(c.lum, vtw::rain_look(dbz).brightness, 1e-12);
+            else { CHECK_NEAR(c.lum, vtw::rain_look(dbz).brightness, 1e-12); CHECK(c.shimmer == 0); }          // alone, it holds still
         }
     CHECK(lit > 0);
     CHECK(light > 0 && heavy > light && core > heavy);        // brighter with strength, and the core shows
@@ -106,7 +106,8 @@ void draw_tests() {
     // no picture at all: nothing is drawn
     vtscreen::Picture empty;
     empty.init(20, 50);
-    vtw::draw_radar(grid, vtw::RadarFrame(), empty);
+    vtw::LayerBlend empty_blend(empty);
+    vtw::draw_radar(grid, vtw::RadarFrame(), empty_blend);
     for (const vtscreen::PicCell& c : empty.cell) CHECK(c.lum == 0);
 }
 
@@ -120,7 +121,7 @@ void legend_tests() {
     double before = 0;
     for (int i = 0; i < vtw::LEGEND_WIDTH; i++) {
         const vtscreen::PicCell& c = picture.at(strip, left + i);
-        CHECK(!c.text && c.lum >= before && c.lum > 0.3);
+        CHECK(!c.text && c.lum >= before && c.lum > 0.3 && c.shimmer == 0);
         before = c.lum;
     }
     CHECK_NEAR(picture.at(strip, left).lum, vtw::rain_look(5).brightness, 1e-12);
@@ -160,20 +161,43 @@ vtw::MapLine ground_line(double lon0, double lat0, double lon1, double lat1) {
     return l;
 }
 
+// the layers a cell has, worked out here from its features, as an independent check of the drawing
+struct Expected { int layers = 0; double lum = 0; double rgb[3] = {0, 0, 0}; };
+
+void expect_layer(Expected& e, double lum, int r, int g, int b) {
+    if (e.layers == 0) { e.lum = lum; e.rgb[0] = r; e.rgb[1] = g; e.rgb[2] = b; }
+    else { e.lum = std::max(e.lum, lum); e.rgb[0] += r; e.rgb[1] += g; e.rgb[2] += b; }
+    e.layers++;
+    for (double& c : e.rgb) c = std::min(255.0, c);
+}
+
+Expected expected_for(vtw::Ground kind, uint8_t f) {
+    Expected e;
+    if (kind == vtw::Ground::Coast) expect_layer(e, 0.33, 190, 170, 120);
+    if (f & vtw::FEATURE_COUNTRY) expect_layer(e, 0.26, 215, 120, 150);
+    else if (f & vtw::FEATURE_STATE) expect_layer(e, 0.20, 150, 120, 175);
+    if (f & vtw::FEATURE_HIGHWAY) expect_layer(e, 0.23, 230, 180, 85);
+    if (f & vtw::FEATURE_RIVER) expect_layer(e, 0.15, 70, 140, 205);
+    return e;
+}
+
 void ground_tests() {
-    // an island with a river, a road, a state border and a country border across it, in a sea
+    // an island with lines across it, in a sea: along latitude 1.2 a river, a border and a highway run together
+    // (three layers in one cell); the island's north edge is also the coast, with a river, a border and a highway
+    // on it (four); a country border, a river that runs along part of it (two layers) and more that cross the others
     vtw::BaseMap map;
     const vtw::GeoBox world{-90, -180, 90, 180};
     auto polygon_layer = [&](vtw::LayerKind kind, std::vector<vtw::MapPolygon> polygons) {
         vtw::MapLayer l; l.kind = kind; l.detail = 2; l.coverage = world; l.polygons = std::move(polygons); return l;
     };
-    auto line_layer = [&](vtw::LayerKind kind, vtw::MapLine line) {
-        vtw::MapLayer l; l.kind = kind; l.detail = 2; l.coverage = world; l.lines.push_back(std::move(line)); return l;
+    auto lines_layer = [&](vtw::LayerKind kind, std::vector<vtw::MapLine> lines) {
+        vtw::MapLayer l; l.kind = kind; l.detail = 2; l.coverage = world; l.lines = std::move(lines); return l;
     };
     map.layers.push_back(polygon_layer(vtw::LayerKind::Land, {ground_square(-2, -2, 2, 2)}));
-    map.layers.push_back(line_layer(vtw::LayerKind::River, ground_line(-1.5, 1.2, 1.5, 1.2)));
-    map.layers.push_back(line_layer(vtw::LayerKind::State, ground_line(-1.5, -0.6, 1.5, -0.6)));
-    map.layers.push_back(line_layer(vtw::LayerKind::Country, ground_line(-1.5, -1.2, 1.5, -1.2)));
+    map.layers.push_back(lines_layer(vtw::LayerKind::River, {ground_line(-1.5, 1.2, 1.5, 1.2), ground_line(-1.5, 1.95, 1.5, 1.95), ground_line(0.8, -1.5, 0.8, 0.5), ground_line(-1.0, -0.6, 0.2, -0.6)}));
+    map.layers.push_back(lines_layer(vtw::LayerKind::State, {ground_line(-1.5, 1.2, 1.5, 1.2), ground_line(-1.5, 1.95, 1.5, 1.95), ground_line(-0.7, -1.5, -0.7, 1.5)}));
+    map.layers.push_back(lines_layer(vtw::LayerKind::Country, {ground_line(-1.5, -0.6, 1.5, -0.6)}));
+    map.layers.push_back(lines_layer(vtw::LayerKind::Highway, {ground_line(-1.5, 1.2, 1.5, 1.2), ground_line(-1.5, 1.95, 1.5, 1.95)}));
     vtw::View view;
     view.set_cell_aspect(2.0);
     view.set_centre({0, 0});
@@ -184,9 +208,10 @@ void ground_tests() {
     const int rows = 50, cols = 120;
     vtscreen::Picture picture;
     picture.init(rows, cols);
-    vtw::draw_ground(ground, picture);
+    vtw::LayerBlend blend(picture);
+    vtw::draw_ground(ground, picture, blend);
 
-    int water = 0, plain_land = 0, coast = 0, country = 0, state = 0, river = 0;
+    int water = 0, plain_land = 0, by_layers[8] = {0};
     for (int row = 0; row < rows; row++)
         for (int col = 0; col < cols; col++) {
             const vtscreen::PicCell& c = picture.at(row, col);
@@ -201,20 +226,28 @@ void ground_tests() {
                 // and a shimmer that is not zero but as low as it gets
                 CHECK(c.lum >= 1.0 / 16 && c.lum < 2.0 / 16);
                 CHECK(c.shimmer > 0 && c.shimmer <= 0.002);
-                CHECK(!c.text);
-            } else if (f == 0 && kind == vtw::Ground::Land) {
+                CHECK(!c.text && blend.layers_at(row, col) == 0);
+                continue;
+            }
+            const Expected e = expected_for(kind, f);
+            CHECK(blend.layers_at(row, col) == e.layers);
+            by_layers[std::min(e.layers, 7)]++;
+            if (e.layers == 0) {
                 plain_land++;                                       // land: no colour and no letters, untouched
                 CHECK(c.lum == 0 && c.alt_lum == 0 && c.r == 0 && c.g == 0 && c.b == 0 && c.shimmer == 1 && !c.text);
-            } else {
-                CHECK(c.alt_lum == 0);                              // lines on the land: letters only, no colour behind them
-                CHECK(c.lum > 0.1 && c.lum < 0.36);                 // dim, below the rain
-                if (f & vtw::FEATURE_COUNTRY) { country++; CHECK(c.lum == 0.26 && c.r == 215); }
-                else if (f & vtw::FEATURE_STATE) { state++; CHECK(c.lum == 0.20 && c.r == 150); }
-                else if (kind == vtw::Ground::Coast) { coast++; CHECK(c.lum == 0.33 && c.r == 190); }
-                else if (f & vtw::FEATURE_RIVER) { river++; CHECK(c.lum == 0.15 && c.r == 70); }
+                continue;
             }
+            // a line, or several: letters only, no colour behind them; the brightest of them, their colours added,
+            // and a shimmer of none for one layer, the base for two, twice it for three, three times it for four
+            CHECK(c.alt_lum == 0);
+            CHECK_NEAR(c.lum, e.lum, 1e-12);
+            CHECK_NEAR(c.r, e.rgb[0], 1e-9);
+            CHECK_NEAR(c.g, e.rgb[1], 1e-9);
+            CHECK_NEAR(c.b, e.rgb[2], 1e-9);
+            CHECK_NEAR(c.shimmer, (e.layers - 1) * vtw::OVERLAP_SHIMMER, 1e-12);
         }
-    CHECK(water > 500 && plain_land > 500 && coast > 20 && country > 10 && state > 10 && river > 10);
+    CHECK(water > 500 && plain_land > 500);
+    CHECK(by_layers[1] > 20 && by_layers[2] > 3 && by_layers[3] > 10 && by_layers[4] > 5);          // one, two, three and four layers
 
     // how it looks as letters. Without colour the water is faint dots and the land is empty (the other way
     // round from how it was); with colour the water is one flat navy
@@ -228,13 +261,13 @@ void ground_tests() {
         }
         return lines;
     };
-    const std::string plain = vtscreen::render_plain(picture, rows, cols, 0.0, 30, false, false, false);
-    const std::vector<std::string> lines = lines_of(plain);
-    CHECK((int)lines.size() == rows);
+    auto render = [&](double t) { return lines_of(vtscreen::render_plain(picture, rows, cols, t, 30, false, false, false)); };
+    const std::vector<std::string> now = render(0.0);
+    CHECK((int)now.size() == rows);
     int dotted_water = 0, blank_land = 0, stray = 0;
-    for (int row = 0; row < rows && row < (int)lines.size(); row++)
-        for (int col = 0; col < cols && col < (int)lines[row].size(); col++) {
-            const char ch = lines[row][col];
+    for (int row = 0; row < rows && row < (int)now.size(); row++)
+        for (int col = 0; col < cols && col < (int)now[row].size(); col++) {
+            const char ch = now[row][col];
             const vtw::Ground kind = ground.at(col, row);
             if (kind == vtw::Ground::Water) {
                 if (ch == '.' || ch == '`' || ch == '\'') dotted_water++;
@@ -246,13 +279,102 @@ void ground_tests() {
         }
     CHECK(stray == 0 && dotted_water == water && blank_land == plain_land);
 
+    // overlaps show without colour, through the shimmer: a cell with one layer never changes its letter, and
+    // most cells with several do
+    const std::vector<std::string> later = render(0.5), much_later = render(300.0);
+    int single_changed = 0, single_cells = 0, overlap_changed = 0, overlap_cells = 0;
+    for (int row = 0; row < rows; row++)
+        for (int col = 0; col < cols; col++) {
+            if (ground.at(col, row) == vtw::Ground::Water) continue;
+            const int layers = blend.layers_at(row, col);
+            if (layers == 1) {
+                single_cells++;
+                single_changed += (now[row][col] != later[row][col]) + (now[row][col] != much_later[row][col]);
+            } else if (layers >= 2) {
+                overlap_cells++;
+                overlap_changed += now[row][col] != later[row][col];
+            }
+        }
+    CHECK(single_cells > 20 && single_changed == 0);
+    CHECK(overlap_cells > 20 && overlap_changed > overlap_cells * 7 / 10);
     // the water hardly moves: the same ten seconds later, but it does move over a few minutes
-    CHECK(vtscreen::render_plain(picture, rows, cols, 10.0, 30, false, false, false) == plain);
-    CHECK(vtscreen::render_plain(picture, rows, cols, 400.0, 30, false, false, false) != plain);
+    const std::vector<std::string> ten = render(10.0);
+    int water_changed_in_ten = 0, water_changed_in_400 = 0;
+    const std::vector<std::string> four_hundred = render(400.0);
+    for (int row = 0; row < rows; row++)
+        for (int col = 0; col < cols; col++)
+            if (ground.at(col, row) == vtw::Ground::Water) {
+                water_changed_in_ten += now[row][col] != ten[row][col];
+                water_changed_in_400 += now[row][col] != four_hundred[row][col];
+            }
+    CHECK(water_changed_in_ten == 0 && water_changed_in_400 > water / 10);
 
     // with colour, the letter colour and the background colour sent for water are the same
     const std::string coloured = vtscreen::render_plain(picture, rows, cols, 0.0, 30, true, false, false);
     CHECK(coloured.find("38;2;0;17;51") != std::string::npos && coloured.find("48;2;0;17;51") != std::string::npos);
+}
+
+// ---- LayerBlend on its own
+
+void blend_tests() {
+    using vtw::Layer;
+    CHECK(vtw::overlap_shimmer(0) == 0 && vtw::overlap_shimmer(1) == 0);
+    CHECK_NEAR(vtw::overlap_shimmer(2), vtw::OVERLAP_SHIMMER, 1e-12);
+    CHECK_NEAR(vtw::overlap_shimmer(4), 3 * vtw::OVERLAP_SHIMMER, 1e-12);
+    CHECK(vtw::OVERLAP_SHIMMER > 0 && vtw::OVERLAP_SHIMMER < 1);
+
+    vtscreen::Picture picture;
+    picture.init(4, 6);
+    vtw::LayerBlend blend(picture);
+    // a cell with the water's own look: the first layer takes its letter and shimmer, not its background
+    vtscreen::PicCell& water = picture.at(1, 1);
+    water.lum = 0.07; water.shimmer = 0.001; water.r = 8; water.g = 22; water.b = 48;
+    water.alt_lum = 1; water.alt_r = 8; water.alt_g = 22; water.alt_b = 48;
+    blend.add(1, 1, Layer::Road, 0.2, 100, 50, 25);
+    CHECK(blend.layers_at(1, 1) == 1);
+    CHECK(water.lum == 0.2 && water.r == 100 && water.g == 50 && water.b == 25 && water.shimmer == 0);
+    CHECK(water.alt_lum == 1 && water.alt_b == 48);
+    // a second layer: brighter of the two, colours added and capped, the base shimmer
+    blend.add(1, 1, Layer::Rain, 0.6, 200, 10, 5);
+    CHECK(blend.layers_at(1, 1) == 2);
+    CHECK(water.lum == 0.6 && water.r == 255 && water.g == 60 && water.b == 30);
+    CHECK_NEAR(water.shimmer, vtw::OVERLAP_SHIMMER, 1e-12);
+    // a dimmer one does not lower the brightness; each more adds the base again
+    blend.add(1, 1, Layer::River, 0.1, 0, 0, 0);
+    CHECK(water.lum == 0.6 && blend.layers_at(1, 1) == 3 && std::fabs(water.shimmer - 2 * vtw::OVERLAP_SHIMMER) < 1e-12);
+    blend.add(1, 1, Layer::Grid, 0.1, 0, 0, 0);
+    CHECK(std::fabs(water.shimmer - 3 * vtw::OVERLAP_SHIMMER) < 1e-12);
+    // the same layer again changes nothing
+    blend.add(1, 1, Layer::Rain, 1.0, 255, 255, 255);
+    CHECK(blend.layers_at(1, 1) == 4 && water.lum == 0.6 && water.g == 60);
+    // other cells are not touched
+    CHECK(blend.layers_at(1, 2) == 0 && picture.at(1, 2).lum == 0 && picture.at(1, 2).shimmer == 1);
+
+    // the order the layers are added in makes no difference
+    const Layer all[4] = {Layer::Grid, Layer::Border, Layer::Coast, Layer::Rain};
+    const double lum[4] = {0.18, 0.26, 0.33, 0.55};
+    const int red[4] = {90, 215, 190, 120}, green[4] = {135, 120, 170, 200}, blue[4] = {175, 150, 120, 60};
+    std::vector<int> order = {0, 1, 2, 3};
+    vtscreen::PicCell first;
+    bool have_first = false;
+    do {
+        vtscreen::Picture p;
+        p.init(1, 1);
+        vtw::LayerBlend b(p);
+        for (int i : order) b.add(0, 0, all[i], lum[i], red[i], green[i], blue[i]);
+        const vtscreen::PicCell& c = p.at(0, 0);
+        if (!have_first) { first = c; have_first = true; }
+        CHECK(c.lum == first.lum && c.r == first.r && c.g == first.g && c.b == first.b && c.shimmer == first.shimmer);
+    } while (std::next_permutation(order.begin(), order.end()));
+    CHECK(first.lum == 0.55 && first.r == 255 && first.g == 255 && first.b == 255);          // 90+215+190+120, capped; blue 505
+    CHECK_NEAR(first.shimmer, 3 * vtw::OVERLAP_SHIMMER, 1e-12);
+
+    // all six layers in one cell: five times the base
+    vtscreen::Picture six;
+    six.init(1, 1);
+    vtw::LayerBlend six_blend(six);
+    for (int i = 0; i < vtw::LAYER_COUNT; i++) six_blend.add(0, 0, (Layer)i, 0.2, 10, 10, 10);
+    CHECK(six_blend.layers_at(0, 0) == 6 && std::fabs(six.at(0, 0).shimmer - 5 * vtw::OVERLAP_SHIMMER) < 1e-12 && six.at(0, 0).r == 60);
 }
 
 }  // namespace
@@ -263,6 +385,7 @@ int main() {
     draw_tests();
     legend_tests();
     ground_tests();
+    blend_tests();
     if (failures == 0) std::printf("all drawing tests passed\n");
     else std::printf("%d check(s) failed\n", failures);
     return failures;

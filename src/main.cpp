@@ -25,6 +25,7 @@
 #include "draw_radar.h"
 #include "ground_map.h"
 #include "input.h"
+#include "layers.h"
 #include "keys.h"
 #include "prompt.h"
 #include "place_labels.h"
@@ -131,10 +132,11 @@ int main(int argc, char** argv) {
         // output
         picture.init(rows - 1, cols);
         const vtw::CellGrid grid(view);
+        vtw::LayerBlend blend(picture);               // where layers overlap, the cell shows it
         ground.update(view);
-        vtw::draw_ground(ground, picture);
-        if (ui.graticule) vtw::draw_graticule(view, grid, picture);
-        vtw::draw_radar(grid, radar.frame(), picture);
+        vtw::draw_ground(ground, picture, blend);
+        if (ui.graticule) vtw::draw_graticule(view, grid, picture, blend);
+        vtw::draw_radar(grid, radar.frame(), blend);
         if (ui.names) {
             places.update(view);
             vtw::draw_places(places, picture);

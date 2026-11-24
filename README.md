@@ -160,11 +160,24 @@ To remake the file (only needed if the map data changes):
     ./tools/get_natural_earth.sh                          downloads the GeoJSON (about 125 MB, the roads being 50 of it), once, politely
     ./build/make_basemap tools/natural_earth data/basemap.bin
 
+## Where things overlap
+
+Rivers, roads, borders, the coast, the grid and the rain are layers. A cell with one of them holds its
+letter still. Where layers overlap, the cell shows it twice over: the colours are added together
+(each channel capped at 255, so an overlap is a new, paler colour), and the cell shimmers, by a base
+rate for each layer beyond the first: two layers shimmer at the base rate, three at twice it, four at
+three times it. The shimmer works without colour too, which is how an overlap shows there. The
+brightness is the brighter of the layers', so rain still reads as rain. The base is `OVERLAP_SHIMMER`
+in `src/layers.h` (0.25: a new letter about three times a second for two layers). The two kinds of
+border (state and country) count as one layer, and so do the two kinds of road; the land and the water
+are the ground the layers sit on and are not layers. The order the layers are drawn in makes no
+difference.
+
 ## Seeing the rain
 
 The program draws the area in `settings.json` (the sample is Wichita, Kansas). To look at weather
 elsewhere, change `location` and `zoom_km` there. Stronger rain is brighter (so it also reads with
-`--no-color`) and shimmers faster; in colour it follows the weather scale: pale blue, green, yellow,
+`--no-color`); in colour it follows the weather scale: pale blue, green, yellow,
 orange, red, magenta. The line at the top left says how the radar is doing. Normally it gives the time of the radar's
 own scan ("radar: scan 05:18 (11:18Z), 1 min old": local time, then UTC), and marks the picture
 "(old)" when it is older than the refresh time; otherwise it says it is asking, or why an update failed

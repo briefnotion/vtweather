@@ -7,10 +7,13 @@
 #pragma once
 
 #include "ground_map.h"
+#include "layers.h"
 #include "vtscreen/vtscreen.h"
 
 namespace vtw {
 
-void draw_ground(const GroundMap& ground, vtscreen::Picture& picture);
+// The lines go in through the LayerBlend (each is a layer), so where they overlap each other, or the
+// grid or the rain, the cell shows it (see layers.h).
+void draw_ground(const GroundMap& ground, vtscreen::Picture& picture, LayerBlend& blend);
 
 }  // namespace vtw

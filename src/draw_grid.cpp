@@ -34,7 +34,7 @@ bool line_between(double low, double high, double step) {
 
 }  // namespace
 
-void draw_graticule(const View& view, const CellGrid& grid, vtscreen::Picture& picture) {
+void draw_graticule(const View& view, const CellGrid& grid, vtscreen::Picture& picture, LayerBlend& blend) {
     const int cols = grid.cols(), rows = grid.rows();
 
     const double lon_per_col = std::fabs(view.at(cols / 2.0 + 1, rows / 2.0).lon -
@@ -49,9 +49,7 @@ void draw_graticule(const View& view, const CellGrid& grid, vtscreen::Picture& p
             const bool lon_line = line_between(cell.west, cell.east, step);
             if (!lat_line && !lon_line) continue;
 
-            vtscreen::PicCell& pic = picture.at(r, c);
-            pic.lum = lat_line && lon_line ? CROSSING_BRIGHTNESS : LINE_BRIGHTNESS;
-            pic.r = 90; pic.g = 135; pic.b = 175;
+            blend.add(r, c, Layer::Grid, lat_line && lon_line ? CROSSING_BRIGHTNESS : LINE_BRIGHTNESS, 90, 135, 175);
 
             // labels: latitudes down the left edge, longitudes along the bottom
             if (lat_line && c == 0)

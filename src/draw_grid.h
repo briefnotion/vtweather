@@ -4,13 +4,14 @@
 #pragma once
 
 #include "cell_grid.h"
+#include "layers.h"
 #include "settings.h"
 #include "view.h"
 #include "vtscreen/vtscreen.h"
 
 namespace vtw {
 
-void draw_graticule(const View& view, const CellGrid& grid, vtscreen::Picture& picture);
+void draw_graticule(const View& view, const CellGrid& grid, vtscreen::Picture& picture, LayerBlend& blend);
 void draw_marker(const View& view, GeoPoint place, vtscreen::Picture& picture);
 void draw_readout(const View& view, const Settings& settings, const std::string& notes,
                   const std::string& radar_status, vtscreen::Picture& picture);

@@ -36,7 +36,6 @@ RainLook rain_look(int dbz) {
     RainLook look{};
     const double t = std::min(std::max((dbz - FAINTEST_DBZ) / (STRONGEST_DBZ - FAINTEST_DBZ), 0.0), 1.0);
     look.brightness = FAINTEST_BRIGHTNESS + BRIGHTNESS_RANGE * std::pow(t, 0.8);
-    look.shimmer = std::min(0.5 + dbz / 25.0, 2.4);
 
     const double d = std::min(std::max<double>(dbz, COLOURS[0].dbz), COLOURS[COLOUR_COUNT - 1].dbz);
     int i = 0;
@@ -50,17 +49,14 @@ RainLook rain_look(int dbz) {
     return look;
 }
 
-void draw_radar(const CellGrid& grid, const RadarFrame& frame, vtscreen::Picture& picture) {
+void draw_radar(const CellGrid& grid, const RadarFrame& frame, LayerBlend& blend) {
     if (frame.width <= 0) return;
     for (int row = 0; row < grid.rows(); row++) {
         for (int col = 0; col < grid.cols(); col++) {
             const uint8_t dbz = frame.strongest_in(grid.box(col, row));
             if (dbz == 0) continue;
             const RainLook look = rain_look(dbz);
-            vtscreen::PicCell& cell = picture.at(row, col);
-            cell.lum = look.brightness;
-            cell.r = look.r; cell.g = look.g; cell.b = look.b;
-            cell.shimmer = look.shimmer;
+            blend.add(row, col, Layer::Rain, look.brightness, look.r, look.g, look.b);
         }
     }
 }
@@ -76,7 +72,7 @@ void draw_legend(vtscreen::Picture& picture) {
         cell = vtscreen::PicCell();
         cell.lum = look.brightness;
         cell.r = look.r; cell.g = look.g; cell.b = look.b;
-        cell.shimmer = look.shimmer;
+        cell.shimmer = 0;                                    // the key, like the rain on its own, holds still
     }
     // the words, in a row of text cells over it
     std::string words(LEGEND_WIDTH, ' ');
