@@ -22,4 +22,24 @@ void radar_picture_size(const GeoBox& box, int& width, int& height);
 // The web address that asks for a picture of the area. The box is clipped to the real earth.
 std::string radar_url(const GeoBox& box);
 
+// The service describes its radar layer, including the time of the newest scan, in a small
+// document (about 18 KB). The program asks for it just before a picture, so that it can ask for the
+// picture of exactly that scan and know when the radar was really looking.
+std::string radar_time_url();
+
+struct ScanTime {
+    double unix_time = 0;        // seconds since 1970 (UTC)
+    std::string iso;             // as the service writes it, such as 2026-11-24T11:13:43Z
+};
+
+// The newest scan time of a layer in the service's capabilities document (the default of its
+// "time" dimension). False if the layer or its time is not there or cannot be read.
+bool parse_scan_time(const std::string& capabilities, const std::string& layer, ScanTime& scan);
+
+// The layer the program draws, as the service names it in its capabilities.
+constexpr const char* RADAR_LAYER = "conus_bref_qcd";
+
+// A picture address with the time of the scan to draw added to it.
+std::string with_scan_time(const std::string& url, const std::string& iso);
+
 }  // namespace vtw

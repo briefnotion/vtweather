@@ -25,11 +25,12 @@ constexpr double STORED_MAX_AGE_SECONDS = 6 * 3600;      // older pictures are n
 struct StoredPicture {
     RadarFrame frame;
     double unix_time = 0;                                // when it was fetched, seconds since 1970
+    double scan_unix = 0;                                // when the radar made the scan, 0 if not known
 };
 
 // One picture as bytes: a signature, its area and size, the time, then the strengths run-length
 // coded (most of a picture is no rain). decode_picture checks everything and says why it refused.
-std::string encode_picture(const RadarFrame& frame, double unix_time);
+std::string encode_picture(const RadarFrame& frame, double unix_time, double scan_unix = 0);
 bool decode_picture(const uint8_t* data, size_t size, StoredPicture& picture, std::string& error);
 
 class RadarStore {
@@ -40,7 +41,7 @@ public:
     std::vector<StoredPicture> load(double unix_now) const;
 
     // Keep a picture: it goes into the slot holding the oldest one (or an empty slot).
-    bool save(const RadarFrame& frame, double unix_time, std::string& error);
+    bool save(const RadarFrame& frame, double unix_time, double scan_unix, std::string& error);
 
 private:
     std::string path_of(int slot) const;
@@ -54,6 +55,7 @@ struct ViewState {
     double zoom_km = 80;
     bool graticule = false;
     bool names = true;
+    bool legend = true;
 };
 
 bool load_view_state(const std::string& folder, ViewState& state);

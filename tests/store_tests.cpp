@@ -39,13 +39,14 @@ void picture_tests() {
     // a picture goes to bytes and comes back the same, whatever it holds
     for (int width : {1, 7, 100, 301}) {
         const RadarFrame frame = make_frame(width, 37, (uint32_t)width);
-        const std::string bytes = vtw::encode_picture(frame, 1766000123.5);
+        const std::string bytes = vtw::encode_picture(frame, 1766000123.5, 1766000001.25);
         vtw::StoredPicture back;
         std::string error;
         CHECK(vtw::decode_picture((const uint8_t*)bytes.data(), bytes.size(), back, error));
         CHECK(back.frame.width == width && back.frame.height == 37);
         CHECK(back.frame.dbz == frame.dbz);
         CHECK_NEAR(back.unix_time, 1766000123.5, 1e-9);
+        CHECK_NEAR(back.scan_unix, 1766000001.25, 1e-9);
         CHECK(back.frame.box.south == 40 && back.frame.box.east == -97);
     }
     // mostly no rain codes small, and a run longer than a run can hold is split
@@ -89,7 +90,7 @@ void picture_tests() {
     // a size that cannot be true is refused before any memory is used
     RadarFrame big = make_frame(10, 10, 1);
     std::string huge = vtw::encode_picture(big, 1);
-    for (int i = 0; i < 4; i++) huge[8 + 8 + 32 + i] = (char)0xFF;       // the width: four billion
+    for (int i = 0; i < 4; i++) huge[8 + 8 + 8 + 32 + i] = (char)0xFF;   // the width: four billion
     CHECK(!vtw::decode_picture((const uint8_t*)huge.data(), huge.size(), p, error) && error.find("size") != std::string::npos);
 }
 
@@ -99,12 +100,13 @@ void slot_tests() {
     std::string error;
     CHECK(store.load(2000).empty());                                  // nothing there yet, and no folder
     // six saves into four slots: the four newest are kept, newest first
-    for (int i = 0; i < 6; i++) CHECK(store.save(make_frame(20, 10, (uint32_t)i, 30 + i), 1000 + i * 100, error));
+    for (int i = 0; i < 6; i++) CHECK(store.save(make_frame(20, 10, (uint32_t)i, 30 + i), 1000 + i * 100, 990 + i * 100, error));
     std::vector<vtw::StoredPicture> got = store.load(2000);
     CHECK(got.size() == 4);
     for (size_t i = 0; i < got.size(); i++) {
         CHECK_NEAR(got[i].unix_time, 1000 + (5 - (double)i) * 100, 1e-9);
         CHECK(got[i].frame.box.south == 30 + (5 - (double)i));
+        CHECK_NEAR(got[i].scan_unix, 990 + (5 - (double)i) * 100, 1e-9);
     }
     // too old are skipped, and so are pictures from the future
     CHECK(store.load(1200 + vtw::STORED_MAX_AGE_SECONDS + 50).size() == 3);        // the oldest of the four (1200) is past the age limit
@@ -117,14 +119,14 @@ void slot_tests() {
         CHECK(store.load(2000).size() == 2);
     }
     // the next save goes into a damaged or empty slot first
-    CHECK(store.save(make_frame(5, 5, 77, 50), 3000, error));
-    CHECK(store.save(make_frame(5, 5, 78, 51), 3100, error));
+    CHECK(store.save(make_frame(5, 5, 77, 50), 3000, 2990, error));
+    CHECK(store.save(make_frame(5, 5, 78, 51), 3100, 0, error));
     got = store.load(3200);
     CHECK(got.size() == 4);
     CHECK_NEAR(got[0].unix_time, 3100, 1e-9);
     // a folder that cannot be made is reported, not a crash
     vtw::RadarStore nowhere("/proc/vtweather_cannot_exist_here");
-    CHECK(!nowhere.save(make_frame(5, 5, 1), 1, error) && !error.empty());
+    CHECK(!nowhere.save(make_frame(5, 5, 1), 1, 1, error) && !error.empty());
     fs::remove_all(folder);
 }
 
@@ -137,13 +139,14 @@ void view_tests() {
     saved.zoom_km = 333.5;
     saved.graticule = true;
     saved.names = false;
+    saved.legend = false;
     std::string error;
     CHECK(vtw::save_view_state(folder, saved, error));
     CHECK(vtw::load_view_state(folder, state));
     CHECK_NEAR(state.centre.lat, 47.25, 1e-12);
     CHECK_NEAR(state.centre.lon, -122.5, 1e-12);
     CHECK_NEAR(state.zoom_km, 333.5, 1e-12);
-    CHECK(state.graticule && !state.names);
+    CHECK(state.graticule && !state.names && !state.legend);
     // damaged, wrong, or impossible files are ignored
     auto write = [&](const std::string& text) { std::ofstream(folder + "/view.json", std::ios::binary | std::ios::trunc) << text; };
     for (const char* text : {"{ not json", "[]", "{\"lat\":1}", "{\"lat\":\"x\",\"lon\":1,\"zoom_km\":2}", "{\"lat\":120,\"lon\":1,\"zoom_km\":2}",
@@ -154,7 +157,7 @@ void view_tests() {
         CHECK(untouched.zoom_km == 333.5);                               // not changed by a refusal
     }
     write("{\"lat\":10,\"lon\":20,\"zoom_km\":30}");                    // the layer flags are optional
-    CHECK(vtw::load_view_state(folder, state) && state.names && !state.graticule);
+    CHECK(vtw::load_view_state(folder, state) && state.names && state.legend && !state.graticule);
     fs::remove_all(folder);
 }
 

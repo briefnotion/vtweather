@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <ctime>
 
 #include "radar_source.h"
 
@@ -14,16 +15,17 @@ FetchSettings radar_fetch_settings(const Settings& settings) {
 }
 
 RadarFeed::RadarFeed(const Settings& settings, RadarStore* store, double unix_at_start)
-    : RadarFeed(radar_fetch_settings(settings), settings.refresh_minutes * 60.0, radar_url, store, unix_at_start) {}
+    : RadarFeed(radar_fetch_settings(settings), settings.refresh_minutes * 60.0, radar_url, store, unix_at_start,
+                radar_time_url()) {}
 
 RadarFeed::RadarFeed(FetchSettings fetch, double refresh_seconds, UrlBuilder url_for, RadarStore* store,
-                     double unix_at_start)
-    : url_for_(std::move(url_for)), worker_(std::move(fetch)), refresh_seconds_(refresh_seconds),
+                     double unix_at_start, std::string time_url)
+    : url_for_(std::move(url_for)), time_url_(std::move(time_url)), worker_(std::move(fetch)), refresh_seconds_(refresh_seconds),
       store_(store), unix_at_start_(unix_at_start) {
     if (!store_) return;
     std::vector<StoredPicture> saved = store_->load(unix_at_start_);     // newest first
     for (auto it = saved.rbegin(); it != saved.rend(); ++it)             // oldest first, so the newest wins
-        cache_.add(std::move(it->frame), it->unix_time - unix_at_start_, 0);
+        cache_.add(std::move(it->frame), it->unix_time - unix_at_start_, 0, it->scan_unix);
 }
 
 void RadarFeed::update(const View& view, double now) {
@@ -31,10 +33,10 @@ void RadarFeed::update(const View& view, double now) {
     if (worker_.take(result)) {
         scheduler_.finished(now, result.ok, result.retry_in);
         if (result.ok) {
-            const std::shared_ptr<const CachedPicture> kept = cache_.add(std::move(result.frame), now, now);
+            const std::shared_ptr<const CachedPicture> kept = cache_.add(std::move(result.frame), now, now, result.scan_unix);
             if (store_) {
                 std::string ignored;                              // a disk that cannot be written is no reason to stop
-                store_->save(kept->frame, unix_at_start_ + now, ignored);
+                store_->save(kept->frame, unix_at_start_ + now, kept->scan_unix, ignored);
             }
             error_.clear();
         } else {
@@ -53,13 +55,27 @@ void RadarFeed::update(const View& view, double now) {
     const bool stale = current_ && now - current_->fetched_at >= refresh_seconds_;
     if (!scheduler_.due(now, (bool)current_, covered, stale)) return;
     const GeoBox area = view.box(REQUEST_MARGIN);
-    if (worker_.request({url_for_(area), area})) scheduler_.requested(now);
+    if (worker_.request({url_for_(area), time_url_, area})) scheduler_.requested(now);
 }
 
 std::string RadarFeed::status(double now) const {
     char text[200];
+    // when the radar made the scan the picture shows (local time, and UTC), and how old that is
+    auto scan_text = [&](const CachedPicture& p) -> std::string {
+        if (p.scan_unix <= 0) return "";
+        const std::time_t when = (std::time_t)p.scan_unix;
+        std::tm local{}, utc{};
+        localtime_r(&when, &local);
+        gmtime_r(&when, &utc);
+        const int minutes = std::max(0, (int)((unix_at_start_ + now - p.scan_unix) / 60));
+        std::snprintf(text, sizeof text, "scan %02d:%02d (%02d:%02dZ), %d min old", local.tm_hour, local.tm_min,
+                      utc.tm_hour, utc.tm_min, minutes);
+        return text;
+    };
     if (offline_) {
         if (!current_) return "radar: off (--offline), no saved picture";
+        const std::string scan = scan_text(*current_);
+        if (!scan.empty()) return "radar: off (--offline), saved picture, " + scan;
         const int minutes = (int)((now - current_->fetched_at) / 60);
         std::snprintf(text, sizeof text, "radar: off (--offline), saved picture from %d min ago", std::max(minutes, 0));
         return text;
@@ -67,10 +83,16 @@ std::string RadarFeed::status(double now) const {
     if (current_) {
         const double age = now - current_->fetched_at;
         const int minutes = (int)(age / 60);
-        if (minutes < 1) std::snprintf(text, sizeof text, "radar: picture just fetched");
-        else std::snprintf(text, sizeof text, "radar: picture fetched %d min ago%s", minutes,
-                           age >= refresh_seconds_ ? " (old)" : "");
-        std::string line = text;
+        std::string line;
+        const std::string scan = scan_text(*current_);
+        if (!scan.empty()) {
+            line = "radar: " + scan;
+        } else {
+            if (minutes < 1) std::snprintf(text, sizeof text, "radar: picture just fetched");
+            else std::snprintf(text, sizeof text, "radar: picture fetched %d min ago", minutes);
+            line = text;
+        }
+        if (age >= refresh_seconds_) line += " (old)";
         if (!error_.empty()) {
             std::snprintf(text, sizeof text, "; update failed (%s), next try in %d s", error_.c_str(),
                           (int)std::max(0.0, retry_at_ - now));

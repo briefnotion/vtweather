@@ -2,6 +2,8 @@
 
 #include <chrono>
 
+#include "radar_source.h"
+
 namespace vtw {
 
 namespace {
@@ -65,7 +67,22 @@ void RadarWorker::run() {
 }
 
 void RadarWorker::do_request(Fetcher& fetcher) {
-    const FetchResult answer = fetcher.get(request_.url);
+    std::string url = request_.url;
+    if (!request_.time_url.empty()) {                          // first, when was the newest scan?
+        const FetchResult caps = fetcher.get(request_.time_url);
+        result_.asked = caps.asked;
+        result_.retry_in = caps.retry_in;
+        if (!caps.ok) {
+            result_.error = caps.error;
+            return;
+        }
+        ScanTime scan;
+        if (parse_scan_time(caps.body, RADAR_LAYER, scan)) {   // if it cannot be read, ask for the newest anyway
+            url = with_scan_time(url, scan.iso);
+            result_.scan_unix = scan.unix_time;
+        }
+    }
+    const FetchResult answer = fetcher.get(url);
     result_.asked = answer.asked;
     result_.retry_in = answer.retry_in;
     if (!answer.ok) {

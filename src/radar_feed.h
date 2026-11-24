@@ -35,7 +35,7 @@ public:
     // is saved. unix_at_start is the clock time (seconds since 1970) of time 0 of update().
     RadarFeed(const Settings& settings, RadarStore* store, double unix_at_start);
     RadarFeed(FetchSettings fetch, double refresh_seconds, UrlBuilder url_for, RadarStore* store = nullptr,
-              double unix_at_start = 0);
+              double unix_at_start = 0, std::string time_url = "");
 
     void set_offline(bool offline) { offline_ = offline; }     // show what is held, ask for nothing
 
@@ -49,6 +49,7 @@ public:
 
 private:
     UrlBuilder url_for_;
+    std::string time_url_;                              // where the time of the newest scan is asked for, or ""
     RadarWorker worker_;
     RadarScheduler scheduler_;
     double refresh_seconds_;

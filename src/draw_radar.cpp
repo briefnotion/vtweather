@@ -65,4 +65,25 @@ void draw_radar(const CellGrid& grid, const RadarFrame& frame, vtscreen::Picture
     }
 }
 
+void draw_legend(vtscreen::Picture& picture) {
+    if (picture.cols < LEGEND_MIN_COLS || picture.bar_row() < LEGEND_MIN_ROWS) return;
+    const int left = picture.cols - LEGEND_WIDTH - 1;
+    const int strip = picture.bar_row() - 1;                  // the row just above the status bar
+    for (int i = 0; i < LEGEND_WIDTH; i++) {
+        const int dbz = (int)std::lround(FAINTEST_DBZ + (STRONGEST_DBZ - FAINTEST_DBZ) * i / (LEGEND_WIDTH - 1));
+        const RainLook look = rain_look(dbz);
+        vtscreen::PicCell& cell = picture.at(strip, left + i);
+        cell = vtscreen::PicCell();
+        cell.lum = look.brightness;
+        cell.r = look.r; cell.g = look.g; cell.b = look.b;
+        cell.shimmer = look.shimmer;
+    }
+    // the words, in a row of text cells over it
+    std::string words(LEGEND_WIDTH, ' ');
+    const std::string light = "light rain", heavy = "heavy";
+    words.replace(0, light.size(), light);
+    words.replace(LEGEND_WIDTH - heavy.size(), heavy.size(), heavy);
+    picture.text(strip - 1, left, words, 190, 190, 190);
+}
+
 }  // namespace vtw

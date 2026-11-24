@@ -9,6 +9,7 @@
 //   r           back to the place and zoom in the settings
 //   g           show or hide the grid of latitude and longitude lines
 //   n           show or hide the city names
+//   k           show or hide the key to the rain
 #pragma once
 
 #include "keys.h"
@@ -18,12 +19,13 @@
 
 namespace vtw {
 
-enum class Command { None, ZoomIn, ZoomOut, PanLeft, PanRight, PanUp, PanDown, Reset, ToggleGraticule, ToggleNames, OpenGoto };
+enum class Command { None, ZoomIn, ZoomOut, PanLeft, PanRight, PanUp, PanDown, Reset, ToggleGraticule, ToggleNames, ToggleLegend, OpenGoto };
 
 // What is shown, apart from where the view is.
 struct UiState {
     bool graticule = false;
     bool names = true;
+    bool legend = true;
     PromptState prompt;                // the go-to prompt, when it is open
 };
 

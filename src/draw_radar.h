@@ -21,4 +21,11 @@ RainLook rain_look(int dbz);
 
 void draw_radar(const CellGrid& grid, const RadarFrame& frame, vtscreen::Picture& picture);
 
+// A small key to the rain, in the lower right: a strip from light to heavy rain made of the same
+// cells the rain is drawn with (so it shows the letters and colours as they really look), and a
+// line of words over it. Left out when the screen is too small.
+constexpr int LEGEND_WIDTH = 28;
+constexpr int LEGEND_MIN_COLS = 70, LEGEND_MIN_ROWS = 16;
+void draw_legend(vtscreen::Picture& picture);
+
 }  // namespace vtw

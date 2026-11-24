@@ -13,6 +13,7 @@ Command command_for_key(char key) {
         case 'r': case 'R': return Command::Reset;
         case 'g': case 'G': return Command::ToggleGraticule;
         case 'n': case 'N': return Command::ToggleNames;
+        case 'k': case 'K': return Command::ToggleLegend;
         case '/': case 'l': case 'L': return Command::OpenGoto;
         default: return Command::None;
     }
@@ -43,6 +44,7 @@ void apply_command(Command command, View& view, const Settings& settings, UiStat
             break;
         case Command::ToggleGraticule: ui.graticule = !ui.graticule; break;
         case Command::ToggleNames: ui.names = !ui.names; break;
+        case Command::ToggleLegend: ui.legend = !ui.legend; break;
         case Command::OpenGoto: ui.prompt = PromptState(); ui.prompt.active = true; break;
         case Command::None: break;
     }

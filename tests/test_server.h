@@ -10,6 +10,9 @@
 //   /png/NAME      200, the picture DIR/NAME.png (DIR is given to the constructor)
 //   /truncated/NAME  200, the first half of that file
 //   /xml           200, "text/xml": what a map server says about a request it cannot draw
+//   /caps          200, the real NOAA capabilities document in DIR/noaa_capabilities_conus.xml
+//   /garbage       200, "text/xml", something that is not a capabilities document
+// The paths asked for (with their queries) are kept: see paths().
 #pragma once
 
 #include <arpa/inet.h>
@@ -19,6 +22,8 @@
 #include <unistd.h>
 
 #include <atomic>
+#include <mutex>
+#include <vector>
 #include <chrono>
 #include <fstream>
 #include <sstream>
@@ -50,6 +55,10 @@ public:
 
     std::string url(const std::string& path) const { return "http://127.0.0.1:" + std::to_string(port_) + path; }
     int requests() const { return requests_; }
+    std::vector<std::string> paths() const {              // every path asked for, with its query, in order
+        std::lock_guard<std::mutex> lock(mutex_);
+        return paths_;
+    }
 
 private:
     void serve() {
@@ -82,7 +91,12 @@ private:
         }
         requests_++;
         const size_t path_start = request.find(' ') + 1;
-        const std::string path = request.substr(path_start, request.find(' ', path_start) - path_start);
+        const std::string full_path = request.substr(path_start, request.find(' ', path_start) - path_start);
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            paths_.push_back(full_path);
+        }
+        const std::string path = full_path.substr(0, full_path.find('?') == std::string::npos || full_path.compare(0, 8, "/status/") == 0 ? std::string::npos : full_path.find('?'));
         std::string agent;
         const size_t at = request.find("User-Agent: ");
         if (at != std::string::npos) agent = request.substr(at + 12, request.find("\r\n", at) - at - 12);
@@ -100,6 +114,12 @@ private:
             for (int i = 0; i < 60 && !stop_; i++) std::this_thread::sleep_for(std::chrono::milliseconds(50));
             reply(200, "text/plain", "late");
         } else if (path == "/big") reply(200, "application/octet-stream", std::string(3 * 1024 * 1024, 'b'));
+        else if (path == "/caps") {
+            std::ifstream in(data_dir_ + "/noaa_capabilities_conus.xml", std::ios::binary);
+            std::stringstream bytes;
+            bytes << in.rdbuf();
+            reply(200, "text/xml", bytes.str());
+        } else if (path == "/garbage") reply(200, "text/xml", "<html>nothing like capabilities</html>");
         else if (path == "/xml") reply(200, "text/xml", "<ServiceExceptionReport>no such layer</ServiceExceptionReport>");
         else if (path.compare(0, 5, "/png/") == 0 || path.compare(0, 11, "/truncated/") == 0) {
             const bool cut = path[1] == 't';
@@ -121,5 +141,7 @@ private:
     int port_ = 0;
     std::atomic<bool> stop_{false};
     std::atomic<int> requests_{0};
+    mutable std::mutex mutex_;
+    std::vector<std::string> paths_;
     std::thread thread_;
 };

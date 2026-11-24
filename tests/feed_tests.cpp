@@ -161,6 +161,38 @@ void tests() {
     }
 }
 
+// the real scan time in the status line, and kept with the picture
+void scan_status_tests() {
+    namespace fs = std::filesystem;
+    setenv("TZ", "UTC", 1);                                   // so that local time is UTC in this test
+    tzset();
+    const std::string folder = (fs::temp_directory_path() / ("vtw_feed_scan_" + std::to_string(getpid()))).string();
+    fs::remove_all(folder);
+    const vtw::View view = make_view();
+    TestServer server(VTW_TEST_DATA_DIR);
+    auto url = [&](const vtw::GeoBox&) { return server.url("/png/noaa_seattle_rain"); };
+    const double scan = 1795518823.0;                          // 2026-11-24 11:13:43 UTC, in the capabilities
+    const double start = scan + 130;                           // two minutes and ten seconds later
+
+    {
+        vtw::RadarStore store(folder);
+        vtw::RadarFeed feed(quick_settings(), 300, url, &store, start, server.url("/caps"));
+        double t = 0;
+        CHECK(wait_for_status(feed, view, t, "scan 11:13 (11:13Z), 2 min old"));
+        CHECK(server.paths().size() == 2 && server.paths()[0] == "/caps");
+    }
+    {   // the scan time was kept with the picture: a later run shows how old the scan is, offline too
+        vtw::RadarStore store(folder);
+        vtw::RadarFeed feed(quick_settings(), 300, url, &store, start + 200, server.url("/caps"));
+        feed.set_offline(true);
+        feed.update(view, 0);
+        CHECK(feed.has_frame());
+        CHECK(has(feed.status(0), "scan 11:13 (11:13Z), 5 min old"));
+        CHECK(has(feed.status(0), "--offline"));
+    }
+    fs::remove_all(folder);
+}
+
 // pictures kept between runs
 void store_tests() {
     namespace fs = std::filesystem;
@@ -234,6 +266,7 @@ void store_tests() {
 
 int main() {
     tests();
+    scan_status_tests();
     store_tests();
     if (failures == 0) std::printf("all radar feed tests passed\n");
     else std::printf("%d check(s) failed\n", failures);

@@ -16,7 +16,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-constexpr char PICTURE_MAGIC[8] = {'V', 'T', 'W', 'R', 'A', 'D', '1', '\n'};
+constexpr char PICTURE_MAGIC[8] = {'V', 'T', 'W', 'R', 'A', 'D', '2', '\n'};
 constexpr int MAX_SIDE = 8192;
 constexpr size_t MAX_PIXELS = 32u * 1024 * 1024;
 
@@ -84,9 +84,10 @@ std::string default_cache_dir() {
     return "";
 }
 
-std::string encode_picture(const RadarFrame& frame, double unix_time) {
+std::string encode_picture(const RadarFrame& frame, double unix_time, double scan_unix) {
     std::string s(PICTURE_MAGIC, sizeof PICTURE_MAGIC);
     put64(s, unix_time);
+    put64(s, scan_unix);
     put64(s, frame.box.south); put64(s, frame.box.west); put64(s, frame.box.north); put64(s, frame.box.east);
     put32(s, (uint32_t)frame.width);
     put32(s, (uint32_t)frame.height);
@@ -107,13 +108,14 @@ bool decode_picture(const uint8_t* data, size_t size, StoredPicture& picture, st
     if (size < sizeof PICTURE_MAGIC || std::memcmp(data, PICTURE_MAGIC, sizeof PICTURE_MAGIC) != 0) return fail("not a stored picture");
     Reader in{data, size, sizeof PICTURE_MAGIC};
     picture.unix_time = in.f64();
+    picture.scan_unix = in.f64();
     picture.frame.box.south = in.f64(); picture.frame.box.west = in.f64();
     picture.frame.box.north = in.f64(); picture.frame.box.east = in.f64();
     const uint32_t width = in.u32(), height = in.u32();
     if (in.bad) return fail("the stored picture is cut off");
     if (width == 0 || height == 0 || width > (uint32_t)MAX_SIDE || height > (uint32_t)MAX_SIDE || (size_t)width * height > MAX_PIXELS)
         return fail("the stored picture has an impossible size");
-    if (!std::isfinite(picture.unix_time) || !(picture.frame.box.east > picture.frame.box.west) ||
+    if (!std::isfinite(picture.unix_time) || !std::isfinite(picture.scan_unix) || !(picture.frame.box.east > picture.frame.box.west) ||
         !(picture.frame.box.north > picture.frame.box.south) || !std::isfinite(picture.frame.box.south + picture.frame.box.west))
         return fail("the stored picture has an impossible area");
     const size_t total = (size_t)width * height;
@@ -148,7 +150,7 @@ std::vector<StoredPicture> RadarStore::load(double unix_now) const {
     return pictures;
 }
 
-bool RadarStore::save(const RadarFrame& frame, double unix_time, std::string& error) {
+bool RadarStore::save(const RadarFrame& frame, double unix_time, double scan_unix, std::string& error) {
     int target = 0;
     double oldest = 1e300;
     for (int slot = 0; slot < STORED_PICTURES; slot++) {            // an empty or unreadable slot, else the oldest
@@ -159,7 +161,7 @@ bool RadarStore::save(const RadarFrame& frame, double unix_time, std::string& er
                                    ? existing.unix_time : -1e300;
         if (age_key < oldest) { oldest = age_key; target = slot; }
     }
-    return write_file_atomically(path_of(target), encode_picture(frame, unix_time), error);
+    return write_file_atomically(path_of(target), encode_picture(frame, unix_time, scan_unix), error);
 }
 
 bool load_view_state(const std::string& folder, ViewState& state) {
@@ -174,6 +176,7 @@ bool load_view_state(const std::string& folder, ViewState& state) {
         s.zoom_km = json.at("zoom_km").get<double>();
         if (json.contains("graticule")) s.graticule = json["graticule"].get<bool>();
         if (json.contains("names")) s.names = json["names"].get<bool>();
+        if (json.contains("legend")) s.legend = json["legend"].get<bool>();
         if (!std::isfinite(s.centre.lat) || !std::isfinite(s.centre.lon) || !std::isfinite(s.zoom_km)) return false;
         if (std::fabs(s.centre.lat) > 90 || std::fabs(s.centre.lon) > 360) return false;
         state = s;
@@ -190,6 +193,7 @@ bool save_view_state(const std::string& folder, const ViewState& state, std::str
     json["zoom_km"] = state.zoom_km;
     json["graticule"] = state.graticule;
     json["names"] = state.names;
+    json["legend"] = state.legend;
     return write_file_atomically(folder + "/view.json", json.dump(2) + "\n", error);
 }
 

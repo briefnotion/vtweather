@@ -17,6 +17,7 @@ constexpr size_t RADAR_CACHE_PICTURES = 8;       // up to about 2 MB each, at th
 struct CachedPicture {
     RadarFrame frame;
     double fetched_at = 0;       // seconds on the program's clock (negative: from before it started)
+    double scan_unix = 0;        // when the radar made the scan (seconds since 1970); 0 if not known
     double used_at = 0;          // when it was last looked up
 };
 
@@ -27,7 +28,7 @@ public:
     explicit RadarCache(size_t limit = RADAR_CACHE_PICTURES) : limit_(limit) {}
 
     // Keep a picture; returns it as stored. Older pictures it covers are dropped.
-    std::shared_ptr<const CachedPicture> add(RadarFrame frame, double fetched_at, double now);
+    std::shared_ptr<const CachedPicture> add(RadarFrame frame, double fetched_at, double now, double scan_unix = 0);
 
     // The newest picture that covers the area, or null.
     std::shared_ptr<const CachedPicture> best_for(const GeoBox& area, double now);

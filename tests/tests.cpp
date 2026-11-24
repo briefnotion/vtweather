@@ -427,6 +427,7 @@ void input_tests() {
     CHECK(vtw::command_for_key('s') == Command::PanDown && vtw::command_for_key('a') == Command::PanLeft);
     CHECK(vtw::command_for_key('d') == Command::PanRight && vtw::command_for_key('r') == Command::Reset);
     CHECK(vtw::command_for_key('g') == Command::ToggleGraticule);
+    CHECK(vtw::command_for_key('k') == Command::ToggleLegend);
     CHECK(vtw::command_for_key('n') == Command::ToggleNames && vtw::command_for_key('N') == Command::ToggleNames);
     CHECK(vtw::command_for_key('x') == Command::None && vtw::command_for_key('\n') == Command::None);
 
@@ -511,6 +512,13 @@ void input_tests() {
     CHECK(!ui.names);
     vtw::apply_command(Command::ToggleNames, view, settings, ui);
     CHECK(ui.names);
+
+    // k shows and hides the key to the rain (it starts shown)
+    CHECK(ui.legend);
+    vtw::apply_command(Command::ToggleLegend, view, settings, ui);
+    CHECK(!ui.legend);
+    vtw::apply_command(Command::ToggleLegend, view, settings, ui);
+    CHECK(ui.legend);
 
     // --offline and other flags are taken out of the command line
     {

@@ -9,10 +9,11 @@ bool covers(const GeoBox& picture, const GeoBox& wanted) {
            picture.east >= wanted.east;
 }
 
-std::shared_ptr<const CachedPicture> RadarCache::add(RadarFrame frame, double fetched_at, double now) {
+std::shared_ptr<const CachedPicture> RadarCache::add(RadarFrame frame, double fetched_at, double now, double scan_unix) {
     auto picture = std::make_shared<CachedPicture>();
     picture->frame = std::move(frame);
     picture->fetched_at = fetched_at;
+    picture->scan_unix = scan_unix;
     picture->used_at = now;
 
     // anything older that this picture covers is no use any more

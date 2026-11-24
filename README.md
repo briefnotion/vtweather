@@ -56,7 +56,7 @@ rules it follows are in `src/request_policy.cpp`:
   4 minutes and so on up to 30 minutes, and longer if the server sends `Retry-After`; a success
   starts over, and while it waits nothing goes out at all;
 - never more than 120 requests an hour, as a safety net against a bug that loops;
-- the program itself asks for a picture only at start, then when the picture in use is older than
+- the program itself asks for a picture (two small requests, the scan time and the picture) only at start, then when the picture in use is older than
   `refresh_minutes` (never under 5), and when the view has moved off every picture it holds and
   stayed there for a second; never twice within 5 seconds, and after a failure it waits at least 10
   seconds, or as long as the service asked;
@@ -85,6 +85,7 @@ checksum) and refuses anything odd with a reason, since the pictures come off th
 | `r` | back to the place and zoom in your settings |
 | `g` | show or hide a grid of latitude and longitude lines |
 | `n` | show or hide the city names |
+| `k` | show or hide the key to the rain (a strip from light to heavy in the lower right) |
 | `q` | quit |
 
 Moving or zooming out onto an area the radar picture does not cover makes the program ask for a new
@@ -159,8 +160,19 @@ To remake the file (only needed if the map data changes):
 The program draws the area in `settings.json` (the sample is Wichita, Kansas). To look at weather
 elsewhere, change `location` and `zoom_km` there. Stronger rain is brighter (so it also reads with
 `--no-color`) and shimmers faster; in colour it follows the weather scale: pale blue, green, yellow,
-orange, red, magenta. The line at the top left says how the radar is doing: asking, fetched, or why
-an update failed and when it will try again.
+orange, red, magenta. The line at the top left says how the radar is doing. Normally it gives the time of the radar's
+own scan ("radar: scan 05:18 (11:18Z), 1 min old": local time, then UTC), and marks the picture
+"(old)" when it is older than the refresh time; otherwise it says it is asking, or why an update failed
+and when it will try again.
+
+## The radar's scan time
+
+Just before each picture the program asks NOAA's map service for its capabilities, a small document
+(about 18 KB) that lists the radar layer's scan times; the newest is its default. The program then
+asks for the picture of exactly that scan, so the time shown always belongs to the picture. The
+radar scans about every two minutes, and the time is kept with the picture on disk. If the document
+cannot be read the newest picture is asked for anyway, and the line says when it was fetched
+instead. This doubles the number of requests, but the extra one is small and obeys the same rules.
 
 ## The worker thread
 

@@ -32,6 +32,7 @@ namespace vtw {
 
 struct RadarRequest {
     std::string url;
+    std::string time_url;     // if not empty: asked first, for the time of the newest scan, which is then added to url
     GeoBox box;               // the area the picture will show (what the url asks for)
 };
 
@@ -40,6 +41,7 @@ struct RadarResult {
     bool asked = false;       // a request really went out to the service
     std::string error;        // why not, in words
     double retry_in = 0;      // after a failure or a refusal: seconds until another try is allowed
+    double scan_unix = 0;     // when the radar made the scan the picture shows (seconds since 1970); 0 if not known
     GeoBox box;               // the area that was asked for
     RadarFrame frame;
 };

@@ -81,6 +81,7 @@ int main(int argc, char** argv) {
         view.set_zoom_km(saved_view.zoom_km);
         ui.graticule = saved_view.graticule;
         ui.names = saved_view.names;
+        ui.legend = saved_view.legend;
     }
     auto current_view_state = [&]() {
         vtw::ViewState state;
@@ -88,6 +89,7 @@ int main(int argc, char** argv) {
         state.zoom_km = view.zoom_km();
         state.graticule = ui.graticule;
         state.names = ui.names;
+        state.legend = ui.legend;
         return state;
     };
     vtw::ViewState last_saved = current_view_state();
@@ -139,6 +141,7 @@ int main(int argc, char** argv) {
         }
         vtw::draw_marker(view, settings.home, picture);
         vtw::draw_readout(view, settings, notes, radar.status(t), picture);
+        if (ui.legend && radar.has_frame() && !ui.prompt.active) vtw::draw_legend(picture);
         vtw::draw_prompt(ui.prompt, basemap, picture);
         display.bar(picture, info, t, true);
 
@@ -153,7 +156,7 @@ int main(int argc, char** argv) {
             std::string ignored;
             if (now_state.centre.lat != last_saved.centre.lat || now_state.centre.lon != last_saved.centre.lon ||
                 now_state.zoom_km != last_saved.zoom_km || now_state.graticule != last_saved.graticule ||
-                now_state.names != last_saved.names) {
+                now_state.names != last_saved.names || now_state.legend != last_saved.legend) {
                 vtw::save_view_state(cache_dir, now_state, ignored);
                 last_saved = now_state;
             }
