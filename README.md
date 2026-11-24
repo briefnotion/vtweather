@@ -4,14 +4,15 @@ An overhead map of where you are, zoomable, with the real-time rain on it, drawn
 letters in a terminal. Built on [vtscreen](https://github.com/briefnotion/vtscreen).
 
 **Status:** just started. It reads its settings, has the View that turns places on the earth
-into places on the screen (zoom, pan, cell shape, ready for a rotated map), and shows a
-graticule with a marker as a stand-in for the map. Planned, in this order: a polite web fetcher,
-a PNG reader, one radar frame at a fixed place, zoom and pan keys, a base map, an animated loop
-of the last hour or two, alerts.
+into places on the screen (zoom, pan, cell shape, ready for a rotated map), has a polite web
+fetcher (not used by the screen yet), and shows a graticule with a marker as a stand-in for the
+map. Planned, in this order: a PNG reader, one radar frame at a fixed place, zoom and pan keys,
+a base map, an animated loop of the last hour or two, alerts.
 
 ## Build and run
 
-Linux, `g++` with C++17 and `cmake` 3.16 or later. The libraries are git submodules, so
+Linux, `g++` with C++17, `cmake` 3.16 or later, and the libcurl development files
+(`libcurl4-openssl-dev` on Debian and Ubuntu). The libraries are git submodules, so
 clone with `--recursive`:
 
     git clone --recursive https://github.com/briefnotion/vtweather.git
@@ -38,13 +39,31 @@ it: the notes on screen say what was wrong and what was used instead.
 | `refresh_minutes` | how often to ask for new radar, never less than 5: the radar updates about that often and the data comes from a free service |
 | `user_agent_contact` | optional, how a data service can reach you; sent in the User-Agent |
 
+## Being kind to the data services
+
+The radar comes from free services that owe us nothing, and they may be having a bad day
+themselves. All web access goes through one place, `Fetcher::get()` in `src/fetch.cpp`, and the
+rules it follows are in `src/request_policy.cpp`:
+
+- every request says who is asking: `vtweather/0.1 (+https://github.com/briefnotion/vtweather;
+  your contact)`; the contact comes from `user_agent_contact` in your settings;
+- at least 2 seconds between one request ending and the next starting, one request at a time;
+- after a failure (no answer, a timeout, any HTTP error) it stops asking: 30 seconds, then 1, 2,
+  4 minutes and so on up to 30 minutes, and longer if the server sends `Retry-After`; a success
+  starts over, and while it waits nothing goes out at all;
+- never more than 120 requests an hour, as a safety net against a bug that loops;
+- only https, a 10 second connect and 30 second total time limit, an 8 MB size limit, and a
+  request can be cancelled at once when the program quits.
+
 ## Tests
 
     cmake --build build
     ctest --test-dir build --output-on-failure
 
-They cover the View (scale, cell shape, north up, rotation, round trips, pan, zoom) and the
-settings loader (good, missing, damaged, wrong type, out of range).
+They cover the View (scale, cell shape, north up, rotation, round trips, pan, zoom), the settings
+loader (good, missing, damaged, wrong type, out of range), the request policy (with a made-up
+clock) and the fetcher (pacing, backoff, the hourly limit, timeouts, size limit, cancelling). The
+fetch tests talk to a small server on your own machine; nothing goes to the internet.
 
 ## Third-party code
 

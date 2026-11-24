@@ -15,20 +15,28 @@ if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vtscreen/vtscreen.h" OR
                         "    git submodule update --init")
 endif()
 add_subdirectory(third_party/json)          # nlohmann_json::nlohmann_json (settings, API replies)
+find_package(CURL REQUIRED)                 # fetching from the web (libcurl, and its development files)
+find_package(Threads REQUIRED)
 
-set(VTWEATHER_SOURCES src/settings.cpp src/view.cpp src/draw_grid.cpp)
+set(VTWEATHER_SOURCES src/settings.cpp src/view.cpp src/draw_grid.cpp src/request_policy.cpp src/fetch.cpp)
 
 add_executable(vtweather src/main.cpp ${VTWEATHER_SOURCES})
 # the root is an include path, so sources say #include "vtscreen/vtscreen.h"
 target_include_directories(vtweather PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-target_link_libraries(vtweather PRIVATE nlohmann_json::nlohmann_json)
+target_link_libraries(vtweather PRIVATE nlohmann_json::nlohmann_json CURL::libcurl Threads::Threads)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(vtweather PRIVATE -Wall -Wextra)
 endif()
 
 # tests: cmake --build build && ctest --test-dir build --output-on-failure
 enable_testing()
-add_executable(vtweather_tests tests/tests.cpp src/settings.cpp src/view.cpp)
+add_executable(vtweather_tests tests/tests.cpp src/settings.cpp src/view.cpp src/request_policy.cpp)
 target_include_directories(vtweather_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(vtweather_tests PRIVATE nlohmann_json::nlohmann_json)
 add_test(NAME vtweather_tests COMMAND vtweather_tests)
+
+# the fetch tests use a small server on this machine: nothing goes to the internet
+add_executable(vtweather_fetch_tests tests/fetch_tests.cpp src/fetch.cpp src/request_policy.cpp)
+target_include_directories(vtweather_fetch_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(vtweather_fetch_tests PRIVATE CURL::libcurl Threads::Threads)
+add_test(NAME vtweather_fetch_tests COMMAND vtweather_fetch_tests)

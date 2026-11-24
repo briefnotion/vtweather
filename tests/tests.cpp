@@ -1,4 +1,4 @@
-// Tests for the View and the settings loader. Plain asserts, no framework:
+// Tests for the View, the settings loader and the request policy. Plain asserts, no framework:
 // the program prints what failed and exits with the number of failures.
 #include <cmath>
 #include <cstdio>
@@ -8,6 +8,7 @@
 
 #include "check.h"
 
+#include "../src/request_policy.h"
 #include "../src/settings.h"
 #include "../src/view.h"
 
@@ -213,11 +214,87 @@ void settings_tests() {
 }
 
 
+// The request policy, with a made-up clock (seconds)
+void policy_tests() {
+    using vtw::Decision;
+    using vtw::RequestPolicy;
+
+    // a new policy lets the first request go; a second one right after must wait for the gap
+    {
+        RequestPolicy p;
+        CHECK(p.ask(100).kind == Decision::Go);
+        p.started(100);
+        p.succeeded(101);
+        Decision d = p.ask(101.5);
+        CHECK(d.kind == Decision::WaitThenGo);
+        CHECK_NEAR(d.seconds, 1.5, 1e-9);                      // the gap is 2 s
+        CHECK(p.ask(103.1).kind == Decision::Go);
+    }
+    // after a failure: 30 s, then 60, 120, ... up to 30 minutes, and success starts over
+    {
+        RequestPolicy p;
+        double t = 1000;
+        const double expected[] = {30, 60, 120, 240, 480, 960, 1800, 1800};
+        for (double wait : expected) {
+            p.started(t);
+            p.failed(t + 1);
+            t += 1;
+            CHECK_NEAR(p.backoff_seconds(), wait, 1e-9);
+            const Decision d = p.ask(t + 0.5);
+            CHECK(d.kind == Decision::Refuse);
+            CHECK_NEAR(d.seconds, wait - 0.5, 1e-9);
+            CHECK(p.ask(t + wait + 0.001).kind == Decision::Go);
+            t += wait + 3;
+        }
+        p.started(t);
+        p.succeeded(t + 1);
+        CHECK_NEAR(p.backoff_seconds(), 0, 1e-12);
+        CHECK(p.ask(t + 4).kind == Decision::Go);
+    }
+    // a server that says Retry-After is obeyed when it asks for more than our backoff, but
+    // never for longer than an hour
+    {
+        RequestPolicy p;
+        p.started(0);
+        p.failed(1, 300);
+        CHECK_NEAR(p.ask(1).seconds, 300, 1e-9);
+        p.started(400);
+        p.failed(401, 99999);
+        CHECK_NEAR(p.ask(401).seconds, 3600, 1e-9);
+        p.started(5000);
+        p.failed(5001, 5);                                       // less than the backoff: the backoff wins
+        CHECK_NEAR(p.ask(5001).seconds, 120, 1e-9);
+    }
+    // giving up on a request is not the server's fault: no backoff
+    {
+        RequestPolicy p;
+        p.started(10);
+        p.cancelled(11);
+        CHECK_NEAR(p.backoff_seconds(), 0, 1e-12);
+        CHECK(p.ask(11.5).kind == Decision::WaitThenGo);
+        CHECK(p.ask(13.1).kind == Decision::Go);
+    }
+    // the hourly limit, which frees up as old requests age out
+    {
+        vtw::PolicyLimits limits;
+        limits.max_per_hour = 5;
+        RequestPolicy p(limits);
+        double t = 0;
+        for (int i = 0; i < 5; i++) { CHECK(p.ask(t).kind == Decision::Go); p.started(t); p.succeeded(t + 0.1); t += 10; }
+        const Decision d = p.ask(t);                              // t = 50
+        CHECK(d.kind == Decision::Refuse);
+        CHECK_NEAR(d.seconds, 3600 - 50, 1e-9);                   // until the first one is an hour old
+        CHECK(p.ask(3600.5).kind == Decision::Go);
+        CHECK(p.requests_in_last_hour(3600.5) == 4);
+    }
+}
+
 }  // namespace
 
 int main() {
     view_tests();
     settings_tests();
+    policy_tests();
     if (failures == 0) std::printf("all tests passed\n");
     else std::printf("%d check(s) failed\n", failures);
     return failures;
