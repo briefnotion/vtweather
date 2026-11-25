@@ -187,6 +187,23 @@ void settings_tests() {
     CHECK(notes.find("gps_file") != std::string::npos);
     CHECK(s.gps_file == "/dev/shm/exchange/gps.json");
 
+    // the speed at which the car counts as moving
+    CHECK_NEAR(s.moving_mph, 5.0, 1e-12);                       // by default (s is from the gps_file test above: the default settings)
+    notes.clear();
+    s = vtw::load_settings(write_file("vtw_moving.json", R"({"moving_mph":8.5})"), notes);
+    CHECK(notes.empty());
+    CHECK_NEAR(s.moving_mph, 8.5, 1e-12);
+    s = vtw::load_settings(write_file("vtw_moving_range.json", R"({"moving_mph":0})"), notes);
+    CHECK_NEAR(s.moving_mph, 1.0, 1e-12);
+    CHECK(notes.find("moving_mph") != std::string::npos);
+    notes.clear();
+    s = vtw::load_settings(write_file("vtw_moving_big.json", R"({"moving_mph":500})"), notes);
+    CHECK_NEAR(s.moving_mph, 30.0, 1e-12);
+    notes.clear();
+    s = vtw::load_settings(write_file("vtw_moving_type.json", R"({"moving_mph":"fast"})"), notes);
+    CHECK(notes.find("moving_mph") != std::string::npos);
+    CHECK_NEAR(s.moving_mph, 5.0, 1e-12);
+
     // not JSON at all
     notes.clear();
     s = vtw::load_settings(write_file("vtw_bad.json", "{ this is not json"), notes);
@@ -506,6 +523,42 @@ void input_tests() {
     vtw::apply_command(Command::PanRight, far, settings, ui);
     CHECK(vtw::distance_km(f0, far.centre()) > 50 * vtw::distance_km(n0, near.centre()));
     CHECK_NEAR(vtw::distance_km(n0, near.centre()), 1.0, 0.05);       // a tenth of 10 km
+
+    // f follows the car; every move of your own stops it, zoom and the toggles do not
+    {
+        CHECK(vtw::command_for_key('f') == Command::ToggleFollow && vtw::command_for_key('F') == Command::ToggleFollow);
+        vtw::UiState following;
+        CHECK(!following.follow);                                  // not following until you ask
+        vtw::apply_command(Command::ToggleFollow, view, settings, following);
+        CHECK(following.follow);
+        vtw::apply_command(Command::ToggleFollow, view, settings, following);
+        CHECK(!following.follow);
+        for (Command stops : {Command::PanLeft, Command::PanRight, Command::PanUp, Command::PanDown, Command::Reset}) {
+            following.follow = true;
+            vtw::apply_command(stops, view, settings, following);
+            CHECK(!following.follow);
+        }
+        for (Command keeps : {Command::ZoomIn, Command::ZoomOut, Command::ToggleGraticule, Command::ToggleNames, Command::ToggleLegend, Command::None}) {
+            following.follow = true;
+            vtw::apply_command(keeps, view, settings, following);
+            CHECK(following.follow);
+        }
+        following.follow = true;
+        vtw::apply_command(Command::OpenGoto, view, settings, following);       // opening the prompt is not a move yet
+        CHECK(following.follow && following.prompt.active);
+        // the prompt: giving up keeps following, jumping to a city stops it
+        vtw::apply_prompt_result(vtw::PromptResult::Stay, following);
+        CHECK(following.follow);
+        vtw::apply_prompt_result(vtw::PromptResult::Cancelled, following);
+        CHECK(following.follow);
+        vtw::apply_prompt_result(vtw::PromptResult::Jumped, following);
+        CHECK(!following.follow);
+        // and a Pan that is applied to a view moves it, so the zoom is the only thing a follower keeps
+        View keep = make_view(37.0, -97.0, 50, 100, 30);
+        following.follow = true;
+        vtw::apply_command(Command::ZoomIn, keep, settings, following);
+        CHECK(following.follow && keep.zoom_km() < 50);
+    }
 
     // g shows and hides the grid
     CHECK(!ui.graticule);

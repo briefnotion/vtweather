@@ -35,7 +35,7 @@ endif()
 
 set(VTWEATHER_SOURCES src/settings.cpp src/view.cpp src/draw_grid.cpp src/request_policy.cpp src/fetch.cpp src/inflate.cpp src/png.cpp src/radar_frame.cpp src/radar_source.cpp src/radar_worker.cpp
     src/radar_scheduler.cpp src/radar_cache.cpp src/store.cpp src/radar_feed.cpp src/cell_grid.cpp src/draw_radar.cpp src/input.cpp src/basemap.cpp src/ground_map.cpp src/draw_ground.cpp
-    src/place_labels.cpp src/draw_places.cpp src/keys.cpp src/prompt.cpp src/layers.cpp src/card.cpp src/cards.cpp src/gps_feed.cpp)
+    src/place_labels.cpp src/draw_places.cpp src/keys.cpp src/prompt.cpp src/layers.cpp src/card.cpp src/cards.cpp src/gps_feed.cpp src/car.cpp)
 
 set(VTWEATHER_SOURCES_NO_MAIN ${VTWEATHER_SOURCES})
 add_executable(vtweather src/main.cpp ${VTWEATHER_SOURCES})
@@ -44,6 +44,11 @@ target_include_directories(vtweather PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 # where to look for data/basemap.bin when it is not in the folder you run from
 target_compile_definitions(vtweather PRIVATE VTW_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(vtweather PRIVATE nlohmann_json::nlohmann_json CURL::libcurl Threads::Threads)
+
+# a pretend GPS for trying vtweather without a car (see README: "Trying it without a car")
+add_executable(gps_sim tools/gps_sim.cpp src/settings.cpp src/view.cpp)
+target_include_directories(gps_sim PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/tools")
+target_link_libraries(gps_sim PRIVATE nlohmann_json::nlohmann_json Threads::Threads)
 
 # tests: cmake --build build && ctest --test-dir build --output-on-failure
 # Only wanted when developing: -DVTWEATHER_TESTS=OFF skips the test programs (and the map
@@ -132,8 +137,9 @@ add_test(NAME vtweather_library_tests COMMAND vtweather_library_tests)
 
 # the cards: the frame, wrapping, corners, stacking, what each says and when they come and go
 add_executable(vtweather_card_tests tests/card_tests.cpp src/card.cpp src/cards.cpp src/view.cpp src/draw_radar.cpp src/cell_grid.cpp
-               src/radar_frame.cpp src/png.cpp src/inflate.cpp src/layers.cpp)
+               src/radar_frame.cpp src/png.cpp src/inflate.cpp src/layers.cpp src/car.cpp src/gps_feed.cpp)
 target_include_directories(vtweather_card_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(vtweather_card_tests PRIVATE nlohmann_json::nlohmann_json)
 add_test(NAME vtweather_card_tests COMMAND vtweather_card_tests)
 
 # the GPS reader: the file's layout, how fresh it is, damaged files, and the real writer's output
@@ -142,4 +148,17 @@ target_include_directories(vtweather_gps_tests PRIVATE "${CMAKE_CURRENT_SOURCE_D
 target_compile_definitions(vtweather_gps_tests PRIVATE VTW_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
 target_link_libraries(vtweather_gps_tests PRIVATE nlohmann_json::nlohmann_json)
 add_test(NAME vtweather_gps_tests COMMAND vtweather_gps_tests)
+
+# the car: moving or not, holding the position, the arrow, drawing it
+add_executable(vtweather_car_tests tests/car_tests.cpp src/car.cpp src/gps_feed.cpp src/view.cpp)
+target_include_directories(vtweather_car_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(vtweather_car_tests PRIVATE nlohmann_json::nlohmann_json)
+add_test(NAME vtweather_car_tests COMMAND vtweather_car_tests)
+
+# the pretend GPS's drive, and the file it writes, read back by the reader and the car
+add_executable(vtweather_gps_sim_tests tests/gps_sim_tests.cpp src/car.cpp src/gps_feed.cpp src/view.cpp)
+target_include_directories(vtweather_gps_sim_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/tools")
+target_compile_definitions(vtweather_gps_sim_tests PRIVATE VTW_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
+target_link_libraries(vtweather_gps_sim_tests PRIVATE nlohmann_json::nlohmann_json Threads::Threads)
+add_test(NAME vtweather_gps_sim_tests COMMAND vtweather_gps_sim_tests)
 endif()  # VTWEATHER_TESTS

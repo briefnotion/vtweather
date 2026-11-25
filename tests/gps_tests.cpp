@@ -165,7 +165,6 @@ void feed_tests() {
         GpsFeed off("");
         off.update(T);
         CHECK(off.state() == GpsState::Off);
-        CHECK(gps_status_text(off, T).empty());
     }
 
     // no file
@@ -175,7 +174,6 @@ void feed_tests() {
         feed.update(T);
         CHECK(feed.state() == GpsState::NoFile);
         CHECK(!feed.has_data());
-        CHECK(gps_status_text(feed, T).empty());         // nothing to say when there is no GPS at all
     }
 
     // a fresh file: a fix
@@ -189,7 +187,6 @@ void feed_tests() {
     CHECK_NEAR(feed.fix().speed_kmph, 88, 1e-9);
     CHECK(feed.fix().seq == 7);
     CHECK_NEAR(feed.age(T + 0.1), 0.1, 1e-6);
-    CHECK(gps_status_text(feed, T + 0.1) == "gps: 88 km/h, heading 87, 9 satellites");
 
     // it is a fix until the file is more than 5 seconds old, then lost; nothing is asked of the file between polls
     feed.update(T + 4.9);
@@ -198,10 +195,8 @@ void feed_tests() {
     CHECK(feed.state() == GpsState::Fix);
     feed.update(T + 5.1);
     CHECK(feed.state() == GpsState::Stale);
-    CHECK(gps_status_text(feed, T + 5.1) == "gps: lost, nothing for 5 s");
     CHECK(feed.fix().lat == 37.5);                       // the last good reading is still there
     feed.update(T + 60);
-    CHECK(gps_status_text(feed, T + 60) == "gps: lost, nothing for 60 s");
 
     // a new write brings it back, with the new values
     put(file, fix_json(38.0, -96.0, true, 20, 180, false, 11, 8), T + 61);
@@ -209,7 +204,6 @@ void feed_tests() {
     CHECK(feed.state() == GpsState::Fix);
     CHECK_NEAR(feed.fix().lat, 38.0, 1e-9);
     CHECK(!feed.fix().heading_valid);
-    CHECK(gps_status_text(feed, T + 61.2) == "gps: 20 km/h, 11 satellites");    // no heading while it is not valid
 
     // looked at about four times a second: a change is seen at the next look, not before
     put(file, fix_json(39.0, -96.0, true, 30, 10, true, 11, 9), T + 61.3);
@@ -231,7 +225,6 @@ void feed_tests() {
     put(file, fix_json(39.5, -96.0, false, 0, 0, false, 3, 10), T + 80);
     feed.update(T + 80.1);
     CHECK(feed.state() == GpsState::NoFix);
-    CHECK(gps_status_text(feed, T + 80.1) == "gps: no fix yet, 3 satellites");
     CHECK(feed.fix().fix == false);
 
     // a file of the real writer
@@ -240,7 +233,6 @@ void feed_tests() {
     CHECK(feed.state() == GpsState::Fix);
     CHECK_NEAR(feed.fix().lat, 37.6901235, 1e-9);
     CHECK_NEAR(feed.fix().speed_kmph, 88.6, 1e-9);
-    CHECK(gps_status_text(feed, T + 90.1) == "gps: 89 km/h, heading 87, 9 satellites");
 
     // a damaged file: unreadable, saying why; the last good reading is kept; the next good file clears it
     put(file, "{\"version\": 1, \"fix\": tr", T + 100);
@@ -248,7 +240,6 @@ void feed_tests() {
     CHECK(feed.state() == GpsState::Bad);
     CHECK(feed.problem() == "not valid JSON");
     CHECK_NEAR(feed.fix().lat, 37.6901235, 1e-9);
-    CHECK(gps_status_text(feed, T + 100.1) == "gps: unreadable (not valid JSON)");
     put(file, R"({"version":2,"fix":true,"lat":1,"lon":2})", T + 101);
     feed.update(T + 101.1);
     CHECK(feed.state() == GpsState::Bad);
@@ -284,7 +275,6 @@ void feed_tests() {
     CHECK(fs::remove(file));
     feed.update(T + 121.2);
     CHECK(feed.state() == GpsState::NoFile);
-    CHECK(gps_status_text(feed, T + 121.2).empty());
     put(file, fix_json(43.0, -95.0), T + 120.25);        // the same time as before: it is read, because it was gone
     feed.update(T + 121.5);
     CHECK(feed.state() == GpsState::Fix);
@@ -307,7 +297,6 @@ void feed_tests() {
         f3.update(T);
         CHECK(f3.state() == GpsState::Stale);
         CHECK(f3.has_data());
-        CHECK(gps_status_text(f3, T).find("gps: lost, nothing for 3600 s") == 0);
     }
 
     // the clock moved: a file from the future (a clock set back) is lost, a little ahead is fine
@@ -347,7 +336,6 @@ void feed_tests() {
         CHECK(f6.state() == GpsState::Bad);
         CHECK(f6.problem() == "file could not be read");
         CHECK(!f6.has_data());
-        CHECK(gps_status_text(f6, T + 0.1) == "gps: unreadable (file could not be read)");
     }
 
     fs::remove_all(dir, ignored);

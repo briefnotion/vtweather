@@ -52,12 +52,14 @@ void read_settings(const Json& json, Settings& s, std::string& notes) {
     read_key(json, "remember_view", s.remember_view, notes);
     read_key(json, "cache_dir", s.cache_dir, notes);
     read_key(json, "gps_file", s.gps_file, notes);
+    read_key(json, "moving_mph", s.moving_mph, notes);
 
     keep_between(s.home.lat, -MAX_CENTRE_LATITUDE, MAX_CENTRE_LATITUDE, "lat", notes);
     keep_between(s.home.lon, -180.0, 180.0, "lon", notes);
     keep_between(s.zoom_km, MIN_KM_ACROSS, MAX_KM_ACROSS, "zoom_km", notes);
     keep_between(s.cell_aspect, 1.0, 3.0, "cell_aspect", notes);
     keep_between(s.refresh_minutes, MIN_REFRESH_MINUTES, 24 * 60, "refresh_minutes", notes);
+    keep_between(s.moving_mph, 1.0, 30.0, "moving_mph", notes);
 }
 
 }  // namespace

@@ -28,6 +28,7 @@ struct Settings {
     bool remember_view = true;        // start where you were looking last time (r still goes home)
     std::string cache_dir;            // where radar pictures and the last view are kept; "" = the usual place
     std::string gps_file = DEFAULT_GPS_FILE;   // the file the GPS position is read from; "" = no GPS
+    double moving_mph = 5.0;          // at this speed and above the car counts as moving (an arrow; below it a +, and the position is held)
     std::string source = "built-in defaults";   // the file the settings came from
 };
 

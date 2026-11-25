@@ -9,7 +9,7 @@
 //                  goes away when you are not
 //   bottom right  the rain card, the key to the rain (k shows and hides it): a line of words and a
 //                  strip from light to heavy rain in the cells the rain is drawn with
-//   bottom left    kept for the driving card (the GPS position, speed and heading), later
+//   bottom left    the driving card (the GPS position, speed and heading), when there is a GPS file
 //
 // A card that does not fit under the ones above it is left out; the top right stack never reaches the
 // rows at the bottom that the rain card uses.
@@ -17,8 +17,10 @@
 
 #include <string>
 
+#include "car.h"
 #include "card.h"
 #include "draw_radar.h"
+#include "gps_feed.h"
 #include "settings.h"
 #include "view.h"
 #include "vtscreen/vtscreen.h"
@@ -39,17 +41,24 @@ struct CardsState {
     bool notes_visible(const std::string& notes) const { return !notes_dismissed && !notes.empty(); }
 };
 
-// gps_status is one more line for the view card, from gps_status_text (gps_feed.h); "" adds none. It stands in
-// until the driving card has the GPS information.
-Card view_card(const View& view, const Settings& settings, const std::string& radar_status, const std::string& gps_status = "");
+Card view_card(const View& view, const Settings& settings, const std::string& radar_status);
 Card help_card();
 Card notes_card(const std::string& notes);       // one line per note (the notes are separated by newlines)
 Card legend_card();                              // the key to the rain
 
+// The driving card: what the GPS says, in miles per hour and feet. With a fix it has the position, the speed (and
+// the heading while the car counts as moving) and the height and satellites; with no fix, or when the data is lost
+// or unreadable, it says so in amber. It has no lines (so nothing is drawn) when there is no GPS to talk about: no
+// file named, or no file at all. age_seconds is how long ago the file was written. While the map follows the car
+// the title says so.
+Card driving_card(GpsState state, const GpsFix& fix, const std::string& problem, double age_seconds, const Car& car,
+                  bool following = false);
+
 // Draw the cards that are due: the stack in the top right corner, and the rain card in the bottom
-// right if show_legend is true and the screen is big enough for it.
+// right if show_legend is true and the screen is big enough for it, and the driving card (if it has lines) in the
+// bottom left.
 void draw_cards(vtscreen::Picture& picture, const View& view, const Settings& settings, const std::string& notes,
                 const std::string& radar_status, bool show_help, bool show_notes, bool show_legend,
-                const std::string& gps_status = "");
+                const Card* driving = nullptr);
 
 }  // namespace vtw

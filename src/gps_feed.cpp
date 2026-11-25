@@ -145,6 +145,8 @@ void GpsFeed::judge(double now_unix) {
     state_ = fix_.fix ? GpsState::Fix : GpsState::NoFix;
 }
 
+// Retired: the driving card (cards.h) says this now.
+#if 0
 std::string gps_status_text(const GpsFeed& gps, double now_unix) {
     char text[160];
     const GpsFix& f = gps.fix();
@@ -169,5 +171,6 @@ std::string gps_status_text(const GpsFeed& gps, double now_unix) {
     }
     return "";
 }
+#endif
 
 }  // namespace vtw

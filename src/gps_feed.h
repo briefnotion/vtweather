@@ -88,7 +88,10 @@ private:
     GpsState state_ = GpsState::NoFile;
 };
 
+// Retired: the driving card (cards.h) says this now.
+#if 0
 // One line for the screen about the GPS, "" when there is nothing to say (off, or no file at all).
 std::string gps_status_text(const GpsFeed& gps, double now_unix);
+#endif
 
 }  // namespace vtw

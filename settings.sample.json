@@ -6,5 +6,6 @@
     "user_agent_contact": "",
     "remember_view": true,
     "cache_dir": "",
-    "gps_file": "/dev/shm/exchange/gps.json"
+    "gps_file": "/dev/shm/exchange/gps.json",
+    "moving_mph": 5
 }

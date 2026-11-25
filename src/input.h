@@ -6,6 +6,8 @@
 //   +  =        zoom in            -  _        zoom out
 //   w a s d, or the arrow keys: move up, left, down, right (w looks further north)
 //   /  or  l    go to a city: type its name, Up and Down choose, Enter goes, Escape gives up
+//   f           follow the car: the map stays centred on it (see car.h). Any move of your own (the move keys, r,
+//               going to a city) stops following; f starts it again, and the map jumps back to the car
 //   r           back to the place and zoom in the settings
 //   g           show or hide the grid of latitude and longitude lines
 //   n           show or hide the city names
@@ -19,13 +21,14 @@
 
 namespace vtw {
 
-enum class Command { None, ZoomIn, ZoomOut, PanLeft, PanRight, PanUp, PanDown, Reset, ToggleGraticule, ToggleNames, ToggleLegend, OpenGoto };
+enum class Command { None, ZoomIn, ZoomOut, PanLeft, PanRight, PanUp, PanDown, Reset, ToggleGraticule, ToggleNames, ToggleLegend, OpenGoto, ToggleFollow };
 
 // What is shown, apart from where the view is.
 struct UiState {
     bool graticule = false;
     bool names = true;
     bool legend = true;
+    bool follow = false;               // the map follows the car (f); not remembered between runs
     PromptState prompt;                // the go-to prompt, when it is open
 };
 
@@ -36,5 +39,8 @@ Command command_for_key(char key);
 Command command_for_event(const Key& key);      // a key as the KeyReader gives it: arrows too
 
 void apply_command(Command command, View& view, const Settings& settings, UiState& ui);
+
+// What the go-to prompt did: jumping to a city is a move of your own, so it stops following.
+void apply_prompt_result(PromptResult result, UiState& ui);
 
 }  // namespace vtw

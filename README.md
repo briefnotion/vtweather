@@ -86,6 +86,7 @@ it: the notes card on screen says what was wrong and what was used instead (see 
 | `remember_view` | `true` (the default): start where you were looking last time; `r` still goes to `location` |
 | `cache_dir` | where pictures and the last view are kept; empty means the usual place (see below) |
 | `gps_file` | the file the GPS position is read from (see "The GPS"); `/dev/shm/exchange/gps.json` by default, empty means no GPS |
+| `moving_mph` | the speed at and above which the car counts as moving, 1 to 30 (5 by default; see "The car on the map") |
 
 ## Being kind to the data services
 
@@ -126,6 +127,7 @@ checksum) and refuses anything odd with a reason, since the pictures come off th
 | `-` or `_` | zoom out (the widest is 6000 km) |
 | `w` `a` `s` `d`, or the arrow keys | move the view up (north), left, down, right, by a tenth of the screen; hold a key to keep moving |
 | `/` or `l` | go to a city: type part of its name, the matches are listed (the biggest first), Up and Down choose one, Enter goes there and Escape gives up |
+| `f` | follow the car: the map stays centred on it (needs the GPS, see "The GPS"). Any move of your own, the move keys, `r` or going to a city, stops following; `f` again starts it and the map jumps back to the car. Zooming keeps following. It starts off, and is not remembered between runs |
 | `r` | back to the place and zoom in your settings |
 | `g` | show or hide a grid of latitude and longitude lines |
 | `n` | show or hide the city names |
@@ -150,13 +152,13 @@ reads over the map. Without colour the frames and the text are still there.
 | view | top right, always | titled with the place name from your settings; the centre of the map, how far across it is and how far each column is ("572 km across, 4.93 km per column"), and how the radar is doing (the scan time, how old, or why an update failed) |
 | notes | under the view card | warnings from starting up, in amber (a settings file that was not found, a missing base map): until your first key press |
 | keys | under that | the keys, one to a row: at the start, and for 30 seconds after any key press, so it is there while you are zooming and moving and goes away when you are not; not while the go-to prompt is open |
+| driving | bottom left, when there is a GPS file | (titled "driving, following" while the map follows the car) what the GPS says, in miles per hour and feet: the position, the speed (and the heading while moving), the height and the satellites; amber for "no fix yet", "lost, nothing for 13 s" and "unreadable" |
 | rain | bottom right | the key to the rain: a strip from light to heavy rain in the same letters and colours as the map (`k` shows and hides it); only when a radar picture is on screen and the screen is at least 70 x 16 |
 
 Long lines wrap (a card is at most 44 characters of text wide). A card that does not fit under the
 ones above it is left out, the notes before the keys, and the stack stops short of the rain card.
 Cards are plain data (`Card`: a title, lines, and an optional strip of colour cells), drawn by
 `draw_card` in `src/card.cpp`; what goes on each one and how they are stacked is in `src/cards.cpp`.
-A driving card (position, speed and heading), bottom left, is planned for when GPS is added.
 
 ## The GPS
 
@@ -186,9 +188,53 @@ computer's): the states are
 | no fix | the GPS is working but has no position yet |
 | fix | a good position, fresh |
 
-For now one line about it is added to the view card (top right): speed, heading and satellites, "no fix yet",
-or "lost"; a card of its own for the driving information, and following the position, come next.
-The reader is Linux only for now (the file's time comes from `stat()`).
+What it says is on the driving card (bottom left, see "The cards"), and the car is on the map (next section).
+Following the car with the map, and a heading-up map, come next. The reader is Linux only for now (the file's
+time comes from `stat()`).
+
+## The car on the map
+
+A GPS is not steady when it stands still: the position wanders by tens of metres, and the direction it reports
+is noise. So the car has two looks, decided by its speed (`moving_mph` in the settings, 5 by default):
+
+- at that speed and above it is moving: a white arrow (`↑ ↗ → ↘ ↓ ↙ ← ↖`, in eight steps) shows the direction of
+  travel at the car's live position;
+- below it, a plain white `+` is drawn, and the position is held where it was when the car was last moving, so a
+  car stopped at a light stays put (and a map that follows the car will not crawl about). It moves again when the
+  car does.
+
+There is a gap so that it does not flicker around the limit: it turns on at 5 mph and off again only below 3.
+The home marker stays a yellow `+`. The marker is only drawn while there is a fix, and the first fix, or a fix that
+comes back after being lost, always starts from the live position (a held position from long ago is no use). The
+driving card still shows the live speed and position, drift and all.
+
+Press `f` to follow the car: the map is kept centred on the marker (so a held position does not crawl either), and the
+driving card's title says "driving, following". Any move of your own stops it (the move keys, `r`, going to a city),
+and `f` starts it again from wherever the car is. Zooming keeps following. While there is no fix the map stays where it
+is, and carries on following when the fix is back. Following starts off each time the program starts.
+
+## Trying it without a car
+
+`gps_sim` is a pretend GPS: it drives a car round a block, over and over, and writes the same file rasfled2 writes
+(see "The GPS"), once a second, so you can watch vtweather's driving card and car marker at your desk. It is built
+with the program (`build/gps_sim`). Run it in one terminal and vtweather in another:
+
+    ./build/gps_sim                          start where settings.json says home is
+    ./build/vtweather
+
+The drive repeats every 165 seconds, after the first seconds with no fix: pulling away, cruising at 50 mph, a right
+turn, a light (braking, then standing still for 12 seconds, where the position wanders by a few metres, the speed
+jitters and the heading is noise), another corner, 55 mph, 8 seconds in a tunnel (nothing is written, so vtweather
+says "lost" after 5), a creep at 4 mph, and round again. Each line it prints says which part of the drive it is in
+and what it just wrote. Ctrl-C quits and removes the file.
+
+Options: `--lat D --lon D` (start somewhere else), `--heading D` (0 is north, 90 east, the default), `--warp N` (cover
+N times the distance, to cross a zoomed-out map; the speed it reports stays real), `--hz N` (writes a second, 1 by
+default), `--no-tunnel`, `--file PATH` (default `/dev/shm/exchange/gps.json`, like `gps_file`), `--settings FILE`,
+`--keep` (leave the file when it quits) and `--force`. It refuses to start if the file was written in the last few
+seconds, since something else (rasfled2) is writing it; do not run the two together. The drive and the file's
+writer are in `tools/gps_sim_route.h`; the tests (`gps_sim_tests`) read what it writes with the real reader and run
+the whole drive through the car.
 
 ## Going to a place by name
 
@@ -343,7 +389,7 @@ They cover the View (scale, cell shape, north up, rotation, round trips, pan, zo
 loader (good, missing, damaged, wrong type, out of range), the request policy (with a made-up
 clock), the fetcher (pacing, backoff, the hourly limit, timeouts, size limit, cancelling), the
 PNG reader, the colour scale, the worker thread, the picture cache, what is kept on disk, the keys and the base map (its file format, the
-ring simplifier, filling land and water into cells, and known places on the real file). The GPS reader has tests too (the file's layout, with files made by rasfled2's real writer; damaged, cut-off and odd files; and every state, with a made-up clock and files whose times are set by hand). The cards have tests too: the frame and its size, wrapping, each corner, stacking, what each card says, the rain card's strip, and when the keys and notes cards come and go. The fetch tests talk to a small server on your own machine; nothing goes to the
+ring simplifier, filling land and water into cells, and known places on the real file). The GPS reader has tests too (the file's layout, with files made by rasfled2's real writer; damaged, cut-off and odd files; and every state, with a made-up clock and files whose times are set by hand). So do the car (when it counts as moving, holding the position, the arrow and where it is drawn) and the pretend GPS (its drive, the drift, the tunnel, and its file read back by the real reader). The cards have tests too: the frame and its size, wrapping, each corner, stacking, what each card says, the rain card's strip, and when the keys and notes cards come and go. The fetch tests talk to a small server on your own machine; nothing goes to the
 internet.
 
 `tests/data/` holds the PNG test pictures, made by `tests/make_png_fixtures.py` (it needs Pillow,

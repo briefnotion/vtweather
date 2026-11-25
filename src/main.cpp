@@ -24,6 +24,7 @@
 #include "draw_ground.h"
 #include "draw_places.h"
 #include "draw_radar.h"
+#include "car.h"
 #include "gps_feed.h"
 #include "ground_map.h"
 #include "input.h"
@@ -106,6 +107,7 @@ int main(int argc, char** argv) {
     radar.set_offline(offline);
 
     vtw::GpsFeed gps(settings.gps_file);       // the car's position, from the file rasfled2 writes
+    vtw::Car car(settings.moving_mph);         // what the map shows of it: an arrow when moving, a + (held in place) when slow
 
     vtscreen::Display display;
     display.open(options, cols, rows);
@@ -127,15 +129,19 @@ int main(int argc, char** argv) {
         reader.flush();
         for (vtw::Key key; reader.next(key);) {
             cards.key_pressed(t);
-            if (ui.prompt.active) vtw::prompt_key(ui.prompt, key, basemap, view);
+            if (ui.prompt.active) vtw::apply_prompt_result(vtw::prompt_key(ui.prompt, key, basemap, view), ui);
             else vtw::apply_command(vtw::command_for_event(key), view, settings, ui);
         }
         display.quit_on_q = !ui.prompt.active;        // while typing, a q is a letter
 
-        // gather: a new radar picture, if one has arrived, and a request if it is time
-        radar.update(view, t);
+        // gather: where the car is, and the map follows it if it is meant to
         const double unix_now = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
         gps.update(unix_now);
+        car.update(gps.state(), gps.fix());
+        vtw::follow_car(ui.follow, car, view);
+
+        // gather: a new radar picture, if one has arrived, and a request if it is time
+        radar.update(view, t);
 
         // output
         picture.init(rows - 1, cols);
@@ -150,9 +156,11 @@ int main(int argc, char** argv) {
             vtw::draw_places(places, picture);
         }
         vtw::draw_marker(view, settings.home, picture);
+        vtw::draw_car(view, car, picture);
+        const vtw::Card driving = vtw::driving_card(gps.state(), gps.fix(), gps.problem(), gps.age(unix_now), car, ui.follow);
         vtw::draw_cards(picture, view, settings, notes, radar.status(t), cards.help_visible(t, ui.prompt.active),
                         cards.notes_visible(notes), ui.legend && radar.has_frame() && !ui.prompt.active,
-                        vtw::gps_status_text(gps, unix_now));
+                        ui.prompt.active ? nullptr : &driving);
         vtw::draw_prompt(ui.prompt, basemap, picture);
         display.bar(picture, info, t, true);
 
