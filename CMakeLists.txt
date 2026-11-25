@@ -35,7 +35,7 @@ endif()
 
 set(VTWEATHER_SOURCES src/settings.cpp src/view.cpp src/draw_grid.cpp src/request_policy.cpp src/fetch.cpp src/inflate.cpp src/png.cpp src/radar_frame.cpp src/radar_source.cpp src/radar_worker.cpp
     src/radar_scheduler.cpp src/radar_cache.cpp src/store.cpp src/radar_feed.cpp src/cell_grid.cpp src/draw_radar.cpp src/input.cpp src/basemap.cpp src/ground_map.cpp src/draw_ground.cpp
-    src/place_labels.cpp src/draw_places.cpp src/keys.cpp src/prompt.cpp src/layers.cpp src/card.cpp src/cards.cpp src/gps_feed.cpp src/car.cpp)
+    src/place_labels.cpp src/draw_places.cpp src/keys.cpp src/prompt.cpp src/layers.cpp src/card.cpp src/cards.cpp src/gps_feed.cpp src/car.cpp src/orientation.cpp)
 
 set(VTWEATHER_SOURCES_NO_MAIN ${VTWEATHER_SOURCES})
 add_executable(vtweather src/main.cpp ${VTWEATHER_SOURCES})
@@ -161,4 +161,11 @@ target_include_directories(vtweather_gps_sim_tests PRIVATE "${CMAKE_CURRENT_SOUR
 target_compile_definitions(vtweather_gps_sim_tests PRIVATE VTW_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
 target_link_libraries(vtweather_gps_sim_tests PRIVATE nlohmann_json::nlohmann_json Threads::Threads)
 add_test(NAME vtweather_gps_sim_tests COMMAND vtweather_gps_sim_tests)
+
+# which way is up: when the map turns, easing round, and the layers drawn with the map turned
+add_executable(vtweather_orientation_tests tests/orientation_tests.cpp src/orientation.cpp src/car.cpp src/gps_feed.cpp src/view.cpp
+               src/cell_grid.cpp src/draw_grid.cpp src/draw_radar.cpp src/layers.cpp src/radar_frame.cpp src/png.cpp src/inflate.cpp)
+target_include_directories(vtweather_orientation_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(vtweather_orientation_tests PRIVATE nlohmann_json::nlohmann_json)
+add_test(NAME vtweather_orientation_tests COMMAND vtweather_orientation_tests)
 endif()  # VTWEATHER_TESTS

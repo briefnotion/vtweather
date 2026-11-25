@@ -128,6 +128,7 @@ checksum) and refuses anything odd with a reason, since the pictures come off th
 | `w` `a` `s` `d`, or the arrow keys | move the view up (north), left, down, right, by a tenth of the screen; hold a key to keep moving |
 | `/` or `l` | go to a city: type part of its name, the matches are listed (the biggest first), Up and Down choose one, Enter goes there and Escape gives up |
 | `f` | follow the car: the map stays centred on it (needs the GPS, see "The GPS"). Any move of your own, the move keys, `r` or going to a city, stops following; `f` again starts it and the map jumps back to the car. Zooming keeps following. It starts off, and is not remembered between runs |
+| `h` | heading up: turn the map so the way the car is going is up the screen, like a car's navigation screen. It turns only while the map follows the car (`f`) and the car is moving; when you slow down or stop, it turns back to north up by itself, and again when you move off. North up is the default, and `h` is not remembered between runs |
 | `r` | back to the place and zoom in your settings |
 | `g` | show or hide a grid of latitude and longitude lines |
 | `n` | show or hide the city names |
@@ -149,7 +150,7 @@ reads over the map. Without colour the frames and the text are still there.
 
 | card | where | shows |
 |---|---|---|
-| view | top right, always | titled with the place name from your settings; the centre of the map, how far across it is and how far each column is ("572 km across, 4.93 km per column"), and how the radar is doing (the scan time, how old, or why an update failed) |
+| view | top right, always | titled with the place name from your settings; the centre of the map, how far across it is and how far each column is ("572 km across, 4.93 km per column"), how the radar is doing (the scan time, how old, or why an update failed), and which way is up ("north up", or where north is when the map is turned) |
 | notes | under the view card | warnings from starting up, in amber (a settings file that was not found, a missing base map): until your first key press |
 | keys | under that | the keys, one to a row: at the start, and for 30 seconds after any key press, so it is there while you are zooming and moving and goes away when you are not; not while the go-to prompt is open |
 | driving | bottom left, when there is a GPS file | (titled "driving, following" while the map follows the car) what the GPS says, in miles per hour and feet: the position, the speed (and the heading while moving), the height and the satellites; amber for "no fix yet", "lost, nothing for 13 s" and "unreadable" |
@@ -212,6 +213,17 @@ Press `f` to follow the car: the map is kept centred on the marker (so a held po
 driving card's title says "driving, following". Any move of your own stops it (the move keys, `r`, going to a city),
 and `f` starts it again from wherever the car is. Zooming keeps following. While there is no fix the map stays where it
 is, and carries on following when the fix is back. Following starts off each time the program starts.
+
+Press `h` for heading up: the map is turned so that the car's direction of travel is up the screen. It does this only
+while the map follows the car (`f`) and the car counts as moving with a direction (the arrow is showing); when you
+slow below the limit, stop, lose the fix or move the map yourself, it turns back to north up, and it turns again when
+you move off. The turn is smooth: the GPS gives a new direction once a second, and the map eases round to it (at most
+120 degrees a second, the short way round) instead of jumping. A GPS wobbles a degree or so, and every turn redraws
+the whole map, so a map that has settled ignores a direction less than 2 degrees away, and only goes all the way to
+the new direction once it has started to turn. Names and the cards stay upright. The last line of the view card says
+which way is up: "north up", "heading up, north ↗" (where north has gone), or "heading up (north up while slow)".
+Each frame the map is turning costs about ten times what a still one does (around 4 ms for a 160 x 49 screen on a
+desktop computer), and only while it is turning.
 
 ## Trying it without a car
 

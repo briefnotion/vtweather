@@ -206,7 +206,8 @@ int main() {
         settings.place_name = "Wichita, Kansas";
         const Card v = view_card(view, settings, "radar: scan 02:58 (08:58Z), 5 min old");
         CHECK(v.title == "Wichita, Kansas");
-        CHECK(v.lines.size() == 3);
+        CHECK(v.lines.size() == 4);
+        CHECK(v.lines[3].text == "north up");
         CHECK(v.lines[0].text == "centre 37.690N 97.340W");
         CHECK(v.lines[1].text.find("572 km across, ") == 0);
         CHECK(v.lines[1].text.find(" km per column") != std::string::npos);
@@ -214,11 +215,32 @@ int main() {
         view.set_centre({-33.9, 151.2});
         CHECK(view_card(view, settings, "").lines[0].text == "centre 33.900S 151.200E");
 
+        // which way is up: the last line
+        View turned = view;
+        CHECK(view_card(turned, settings, "", false).lines[3].text == "north up");
+        CHECK(view_card(turned, settings, "", true).lines[3].text == "heading up (north up while slow)");   // on, but not turned just now
+        turned.set_heading(90);                                                                           // east is up: north is to the left
+        CHECK(view_card(turned, settings, "", true).lines[3].text == "heading up, north ←");
+        turned.set_heading(45);
+        CHECK(view_card(turned, settings, "", true).lines[3].text == "heading up, north ↖");
+        turned.set_heading(180);
+        CHECK(view_card(turned, settings, "", true).lines[3].text == "heading up, north ↓");
+        turned.set_heading(270);
+        CHECK(view_card(turned, settings, "", true).lines[3].text == "heading up, north →");
+        turned.set_heading(0.4);                                                                          // a hair off north is still north up
+        CHECK(view_card(turned, settings, "", false).lines[3].text == "north up");
+        turned.set_heading(359.6);
+        CHECK(view_card(turned, settings, "", false).lines[3].text == "north up");
+        turned.set_heading(0.6);
+        CHECK(view_card(turned, settings, "", true).lines[3].text.find("heading up, north") == 0);
+        CHECK(view_card(turned, settings, "", true).lines.size() == 4);                                   // the card is the same size turned or not
+
         const Card h = help_card();
         CHECK(h.title == "keys");
-        CHECK(h.lines.size() == 9);
+        CHECK(h.lines.size() == 10);
         CHECK(h.lines[0].key == "+ -" && h.lines[0].text == "zoom");
-        CHECK(h.lines[8].key == "q" && h.lines[8].text == "quit");
+        CHECK(h.lines[9].key == "q" && h.lines[9].text == "quit");
+        CHECK(h.lines[4].key == "h" && h.lines[4].text == "heading up");
         CHECK(h.lines[3].key == "f" && h.lines[3].text == "follow");
         for (const CardLine& line : h.lines) {                          // readable: not black, the keys brighter than the words
             CHECK(line.key_colour.r > 150 && line.key_colour.g > 150 && line.key_colour.b > 150);
@@ -245,7 +267,7 @@ int main() {
         const std::string radar = "radar: scan 02:58 (08:58Z), 5 min old";
 
         vtscreen::Picture p;
-        p.init(24, 100);                                              // tall enough for all three
+        p.init(26, 100);                                              // tall enough for all three
         draw_cards(p, view, settings, "a warning", radar, true, true, false);
         // find the three titles, one under another (the view, the notes, the keys), and the frames between them
         auto find_title = [&](const std::string& word) {
@@ -319,7 +341,7 @@ int main() {
         CHECK(short_notes);                                           // the warning comes before the keys, so it is the one kept
 
         // the stack stops short of the last rows above the status bar, where the rain card goes: the
-        // view card (5 rows), a notes card with one note (3) and the keys card (11) need 19 rows
+        // view card (6 rows), a notes card with one note (3) and the keys card (12) need 21 rows
         auto keys_shown_with = [&](int picture_rows) {
             vtscreen::Picture t;
             t.init(picture_rows, 100);
@@ -328,11 +350,11 @@ int main() {
                 if (has(row_text(t, i, 0, 100), "keys")) return true;
             return false;
         };
-        CHECK(card_size(view_card(view, settings, radar), 100).rows == 5);
-        CHECK(card_size(help_card(), 100).rows == 11);
+        CHECK(card_size(view_card(view, settings, radar), 100).rows == 6);
+        CHECK(card_size(help_card(), 100).rows == 12);
         CHECK(card_size(notes_card("a warning"), 100).rows == 3);
-        CHECK(!keys_shown_with(22));                                  // 22 rows, 4 kept free: 18 to use
-        CHECK(keys_shown_with(23));                                   // 19 to use: just fits
+        CHECK(!keys_shown_with(24));                                  // 24 rows, 4 kept free: 20 to use
+        CHECK(keys_shown_with(25));                                   // 21 to use: just fits
     }
 
     // ---- the rain card: the key to the rain

@@ -543,6 +543,20 @@ void input_tests() {
             vtw::apply_command(keeps, view, settings, following);
             CHECK(following.follow);
         }
+        // h turns heading up on and off, and nothing else touches it (not a move of your own, not following)
+        CHECK(vtw::command_for_key('h') == Command::ToggleHeadingUp && vtw::command_for_key('H') == Command::ToggleHeadingUp);
+        CHECK(!following.heading_up);                              // north up until you ask
+        vtw::apply_command(Command::ToggleHeadingUp, view, settings, following);
+        CHECK(following.heading_up);
+        for (Command c : {Command::PanLeft, Command::PanRight, Command::PanUp, Command::PanDown, Command::Reset, Command::ZoomIn, Command::ZoomOut,
+                          Command::ToggleFollow, Command::ToggleGraticule, Command::ToggleNames, Command::ToggleLegend}) {
+            vtw::apply_command(c, view, settings, following);
+            CHECK(following.heading_up);
+        }
+        vtw::apply_prompt_result(vtw::PromptResult::Jumped, following);
+        CHECK(following.heading_up);
+        vtw::apply_command(Command::ToggleHeadingUp, view, settings, following);
+        CHECK(!following.heading_up);
         following.follow = true;
         vtw::apply_command(Command::OpenGoto, view, settings, following);       // opening the prompt is not a move yet
         CHECK(following.follow && following.prompt.active);

@@ -7,6 +7,8 @@ namespace vtw {
 
 namespace {
 
+constexpr double KM_PER_DEGREE = 111.32;           // of latitude, or of longitude at the equator
+constexpr double PI = 3.14159265358979323846;
 constexpr double LINE_BRIGHTNESS = 0.18;
 constexpr double CROSSING_BRIGHTNESS = 0.26;
 constexpr int MIN_CELLS_BETWEEN_LINES = 12;
@@ -37,8 +39,9 @@ bool line_between(double low, double high, double step) {
 void draw_graticule(const View& view, const CellGrid& grid, vtscreen::Picture& picture, LayerBlend& blend) {
     const int cols = grid.cols(), rows = grid.rows();
 
-    const double lon_per_col = std::fabs(view.at(cols / 2.0 + 1, rows / 2.0).lon -
-                                         view.at(cols / 2.0, rows / 2.0).lon);
+    // degrees of longitude in one column at the centre. From the ground distance, not from two points on the screen,
+    // so that it does not change when the map is turned.
+    const double lon_per_col = view.km_per_col() / (KM_PER_DEGREE * std::cos(view.centre().lat * PI / 180.0));
     const double step = nice_step(MIN_CELLS_BETWEEN_LINES * lon_per_col);
     const int decimals = std::max(0, -(int)std::floor(std::log10(step) + 1e-9));
 

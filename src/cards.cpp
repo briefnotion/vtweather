@@ -21,7 +21,7 @@ CardLine keyed(const std::string& key, const std::string& text, Rgb colour) { re
 
 }  // namespace
 
-Card view_card(const View& view, const Settings& settings, const std::string& radar_status) {
+Card view_card(const View& view, const Settings& settings, const std::string& radar_status, bool heading_up) {
     Card card;
     card.title = settings.place_name;
     char text[160];
@@ -32,6 +32,9 @@ Card view_card(const View& view, const Settings& settings, const std::string& ra
     std::snprintf(text, sizeof text, "%.0f km across, %.2f km per column", view.zoom_km(), view.km_per_col());
     card.lines.push_back(plain(text, {170, 170, 170}));
     card.lines.push_back(plain(radar_status, {150, 200, 150}));
+    const bool turned = view.heading() > 0.5 && view.heading() < 359.5;
+    if (turned) card.lines.push_back(plain(std::string("heading up, north ") + arrow_glyph(0, view.heading()), {170, 170, 170}));
+    else card.lines.push_back(plain(heading_up ? "heading up (north up while slow)" : "north up", {170, 170, 170}));
     return card;
 }
 
@@ -44,6 +47,7 @@ Card help_card() {
         keyed("arrows", "move", text),
         keyed("/", "go to", text),
         keyed("f", "follow", text),
+        keyed("h", "heading up", text),
         keyed("r", "reset", text),
         keyed("g", "grid", text),
         keyed("n", "names", text),
@@ -127,7 +131,7 @@ Card driving_card(GpsState state, const GpsFix& fix, const std::string& problem,
 
 void draw_cards(vtscreen::Picture& picture, const View& view, const Settings& settings, const std::string& notes,
                 const std::string& radar_status, bool show_help, bool show_notes, bool show_legend,
-                const Card* driving) {
+                const Card* driving, bool heading_up) {
     const int rows_available = picture.bar_row() - CARDS_FREE_ROWS_AT_BOTTOM;
     int offset = 0;
     auto stack = [&](const Card& card) {
@@ -135,7 +139,7 @@ void draw_cards(vtscreen::Picture& picture, const View& view, const Settings& se
         if (size.rows == 0 || offset + size.rows > rows_available) return;
         if (draw_card(picture, card, Corner::TopRight, offset)) offset += size.rows;
     };
-    stack(view_card(view, settings, radar_status));
+    stack(view_card(view, settings, radar_status, heading_up));
     if (show_notes && !notes.empty()) stack(notes_card(notes));      // a warning is never the card left out
     if (show_help) stack(help_card());
     if (show_legend && picture.cols >= LEGEND_MIN_COLS && picture.bar_row() >= LEGEND_MIN_ROWS)

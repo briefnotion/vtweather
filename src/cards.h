@@ -41,7 +41,9 @@ struct CardsState {
     bool notes_visible(const std::string& notes) const { return !notes_dismissed && !notes.empty(); }
 };
 
-Card view_card(const View& view, const Settings& settings, const std::string& radar_status);
+// The last line says which way is up: "north up", or with the map turned where north has gone ("heading up, north ↗"),
+// or "heading up (north up while slow)" when heading up is on but the map is not turned just now.
+Card view_card(const View& view, const Settings& settings, const std::string& radar_status, bool heading_up = false);
 Card help_card();
 Card notes_card(const std::string& notes);       // one line per note (the notes are separated by newlines)
 Card legend_card();                              // the key to the rain
@@ -59,6 +61,6 @@ Card driving_card(GpsState state, const GpsFix& fix, const std::string& problem,
 // bottom left.
 void draw_cards(vtscreen::Picture& picture, const View& view, const Settings& settings, const std::string& notes,
                 const std::string& radar_status, bool show_help, bool show_notes, bool show_legend,
-                const Card* driving = nullptr);
+                const Card* driving = nullptr, bool heading_up = false);
 
 }  // namespace vtw

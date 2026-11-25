@@ -8,6 +8,8 @@
 //   /  or  l    go to a city: type its name, Up and Down choose, Enter goes, Escape gives up
 //   f           follow the car: the map stays centred on it (see car.h). Any move of your own (the move keys, r,
 //               going to a city) stops following; f starts it again, and the map jumps back to the car
+//   h           heading up: turn the map so the car's direction of travel is up, while following and moving (see
+//               orientation.h); north up otherwise. North up is the default
 //   r           back to the place and zoom in the settings
 //   g           show or hide the grid of latitude and longitude lines
 //   n           show or hide the city names
@@ -21,7 +23,7 @@
 
 namespace vtw {
 
-enum class Command { None, ZoomIn, ZoomOut, PanLeft, PanRight, PanUp, PanDown, Reset, ToggleGraticule, ToggleNames, ToggleLegend, OpenGoto, ToggleFollow };
+enum class Command { None, ZoomIn, ZoomOut, PanLeft, PanRight, PanUp, PanDown, Reset, ToggleGraticule, ToggleNames, ToggleLegend, OpenGoto, ToggleFollow, ToggleHeadingUp };
 
 // What is shown, apart from where the view is.
 struct UiState {
@@ -29,6 +31,7 @@ struct UiState {
     bool names = true;
     bool legend = true;
     bool follow = false;               // the map follows the car (f); not remembered between runs
+    bool heading_up = false;           // the map turns so the car's direction is up (h), when following and moving
     PromptState prompt;                // the go-to prompt, when it is open
 };
 

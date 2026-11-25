@@ -29,6 +29,7 @@
 #include "ground_map.h"
 #include "input.h"
 #include "layers.h"
+#include "orientation.h"
 #include "keys.h"
 #include "prompt.h"
 #include "place_labels.h"
@@ -107,6 +108,8 @@ int main(int argc, char** argv) {
     radar.set_offline(offline);
 
     vtw::GpsFeed gps(settings.gps_file);       // the car's position, from the file rasfled2 writes
+    vtw::HeadingSmoother heading;               // eases the map round when it is heading up
+    double last_frame_time = 0;
     vtw::Car car(settings.moving_mph);         // what the map shows of it: an arrow when moving, a + (held in place) when slow
 
     vtscreen::Display display;
@@ -138,6 +141,8 @@ int main(int argc, char** argv) {
         const double unix_now = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
         gps.update(unix_now);
         car.update(gps.state(), gps.fix());
+        view.set_heading(heading.update(vtw::heading_target(ui.heading_up, ui.follow, car), t - last_frame_time));
+        last_frame_time = t;
         vtw::follow_car(ui.follow, car, view);
 
         // gather: a new radar picture, if one has arrived, and a request if it is time
@@ -160,7 +165,7 @@ int main(int argc, char** argv) {
         const vtw::Card driving = vtw::driving_card(gps.state(), gps.fix(), gps.problem(), gps.age(unix_now), car, ui.follow);
         vtw::draw_cards(picture, view, settings, notes, radar.status(t), cards.help_visible(t, ui.prompt.active),
                         cards.notes_visible(notes), ui.legend && radar.has_frame() && !ui.prompt.active,
-                        ui.prompt.active ? nullptr : &driving);
+                        ui.prompt.active ? nullptr : &driving, ui.heading_up);
         vtw::draw_prompt(ui.prompt, basemap, picture);
         display.bar(picture, info, t, true);
 
