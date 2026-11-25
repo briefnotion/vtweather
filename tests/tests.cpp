@@ -172,6 +172,20 @@ void settings_tests() {
     CHECK_NEAR(s.cell_aspect, 1.8, 1e-12);
     CHECK(s.refresh_minutes == 15);
     CHECK(s.contact == "me");
+    CHECK(s.gps_file == "/dev/shm/exchange/gps.json");          // the GPS file, by default where rasfled2 writes it
+
+    // the GPS file: another place, or none at all
+    notes.clear();
+    s = vtw::load_settings(write_file("vtw_gps.json", R"({"gps_file":"/run/user/1000/gps.json"})"), notes);
+    CHECK(notes.empty());
+    CHECK(s.gps_file == "/run/user/1000/gps.json");
+    s = vtw::load_settings(write_file("vtw_nogps.json", R"({"gps_file":""})"), notes);
+    CHECK(notes.empty());
+    CHECK(s.gps_file.empty());
+    notes.clear();
+    s = vtw::load_settings(write_file("vtw_gpstype.json", R"({"gps_file":7})"), notes);
+    CHECK(notes.find("gps_file") != std::string::npos);
+    CHECK(s.gps_file == "/dev/shm/exchange/gps.json");
 
     // not JSON at all
     notes.clear();

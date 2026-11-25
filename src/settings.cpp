@@ -51,6 +51,7 @@ void read_settings(const Json& json, Settings& s, std::string& notes) {
     read_key(json, "user_agent_contact", s.contact, notes);
     read_key(json, "remember_view", s.remember_view, notes);
     read_key(json, "cache_dir", s.cache_dir, notes);
+    read_key(json, "gps_file", s.gps_file, notes);
 
     keep_between(s.home.lat, -MAX_CENTRE_LATITUDE, MAX_CENTRE_LATITUDE, "lat", notes);
     keep_between(s.home.lon, -180.0, 180.0, "lon", notes);

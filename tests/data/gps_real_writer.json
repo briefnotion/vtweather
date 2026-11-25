@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "seq": 1,
+  "written_unix": 1795603140.994,
+  "gps_time_unix": 1764079402.000,
+  "fix": true,
+  "lat": 37.6901235,
+  "lon": -97.3409877,
+  "altitude_m": 412.0,
+  "speed_kmph": 88.6,
+  "heading_deg": 87.0,
+  "heading_valid": true,
+  "satellites": 9,
+  "hdop": 1.2
+}

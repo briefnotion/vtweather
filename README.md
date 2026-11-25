@@ -63,13 +63,18 @@ If `vtscreen/` or `third_party/json/` is empty, run `git submodule update --init
 `-DVTWEATHER_TESTS=OFF` on the first `cmake` line leaves out the test programs and the map
 maker (see "Tests").
 
+The build is strict: every compiler warning is an error (`-Wall -Wextra -Werror`), for the program
+and the tests, as in rasfled2. It is clean with g++ 12 and 13. If a newer compiler warns about
+something and stops the build, `-DVTWEATHER_STRICT=OFF` on the first `cmake` line shows the warning
+and finishes anyway (and please report it).
+
 ## Settings
 
 `settings.sample.json` shows the settings. Copy it to `settings.json` and put in your own
 place. `settings.json` is in `.gitignore`, so your location is never committed. The program
 reads `settings.json` from the folder you run it in, else `settings.sample.json`, else uses
 built-in defaults; `--settings FILE` names another file. A missing or damaged file never stops
-it: the notes on screen say what was wrong and what was used instead.
+it: the notes card on screen says what was wrong and what was used instead (see "The cards").
 
 | setting | meaning |
 |---|---|
@@ -80,6 +85,7 @@ it: the notes on screen say what was wrong and what was used instead.
 | `user_agent_contact` | optional, how a data service can reach you; sent in the User-Agent |
 | `remember_view` | `true` (the default): start where you were looking last time; `r` still goes to `location` |
 | `cache_dir` | where pictures and the last view are kept; empty means the usual place (see below) |
+| `gps_file` | the file the GPS position is read from (see "The GPS"); `/dev/shm/exchange/gps.json` by default, empty means no GPS |
 
 ## Being kind to the data services
 
@@ -123,13 +129,66 @@ checksum) and refuses anything odd with a reason, since the pictures come off th
 | `r` | back to the place and zoom in your settings |
 | `g` | show or hide a grid of latitude and longitude lines |
 | `n` | show or hide the city names |
-| `k` | show or hide the key to the rain (a strip from light to heavy in the lower right) |
+| `k` | show or hide the rain card, the key to the rain (a strip from light to heavy, in the lower right) |
 | `q` | quit |
+
+Any key press also brings the keys card back for 30 seconds (see "The cards").
 
 Moving or zooming out onto an area the radar picture does not cover makes the program ask for a new
 one, but only after you have stayed there for a second, so holding a key does not send a request
 for every press. Zooming in never needs a new picture: the radar's own detail is about 1 km.
 `--offline` asks the radar service for nothing at all, which is handy for trying the keys.
+
+## The cards
+
+The information is in small framed windows, cards, drawn over the map, with the title set into the
+top edge of a thin rounded border (like the panels of `btop`). They have a dim background so the text
+reads over the map. Without colour the frames and the text are still there.
+
+| card | where | shows |
+|---|---|---|
+| view | top right, always | titled with the place name from your settings; the centre of the map, how far across it is and how far each column is ("572 km across, 4.93 km per column"), and how the radar is doing (the scan time, how old, or why an update failed) |
+| notes | under the view card | warnings from starting up, in amber (a settings file that was not found, a missing base map): until your first key press |
+| keys | under that | the keys, one to a row: at the start, and for 30 seconds after any key press, so it is there while you are zooming and moving and goes away when you are not; not while the go-to prompt is open |
+| rain | bottom right | the key to the rain: a strip from light to heavy rain in the same letters and colours as the map (`k` shows and hides it); only when a radar picture is on screen and the screen is at least 70 x 16 |
+
+Long lines wrap (a card is at most 44 characters of text wide). A card that does not fit under the
+ones above it is left out, the notes before the keys, and the stack stops short of the rain card.
+Cards are plain data (`Card`: a title, lines, and an optional strip of colour cells), drawn by
+`draw_card` in `src/card.cpp`; what goes on each one and how they are stacked is in `src/cards.cpp`.
+A driving card (position, speed and heading), bottom left, is planned for when GPS is added.
+
+## The GPS
+
+On the Raspberry Pi in the car, the position comes from rasfled2, which already reads the GPS. It writes
+the position about once a second to a small JSON file in memory, `/dev/shm/exchange/gps.json` (a folder in
+RAM, so nothing wears out the SD card), and vtweather only reads that file. The two programs know nothing
+else about each other: if rasfled2 is not running there is simply no GPS. Change `gps_file` in your settings
+to read it from somewhere else; an empty `gps_file` turns it off.
+
+    { "version": 1, "seq": 1234, "written_unix": 1764079402.123, "gps_time_unix": 1764079402.0,
+      "fix": true, "lat": 37.690, "lon": -97.340, "altitude_m": 412.0, "speed_kmph": 88.6,
+      "heading_deg": 87.0, "heading_valid": true, "satellites": 9, "hdop": 1.2 }
+
+The writer is `source/gps_exchange.h` in rasfled2 (`gps_exchange_write`, called for each `$GNGGA`). It
+writes a new file and renames it over the old one, so a reader never sees half a file. The reader is
+`GpsFeed` in `src/gps_feed.cpp`: about four times a second it looks at the file's modification time, and
+only when that has changed does it read and parse the file. A damaged file is refused with a reason, and the last
+good reading is kept. How fresh the data is comes from the file's age against the clock (both are the same
+computer's): the states are
+
+| state | meaning |
+|---|---|
+| off | `gps_file` is empty |
+| no file | there is no file: rasfled2 is not running, or has not told us anything yet (nothing is shown) |
+| unreadable | the newest file could not be read; the reason is shown |
+| lost | the file has not been written for 5 seconds (rasfled2 stopped, or the GPS was unplugged); a file left over from long ago is lost at once |
+| no fix | the GPS is working but has no position yet |
+| fix | a good position, fresh |
+
+For now one line about it is added to the view card (top right): speed, heading and satellites, "no fix yet",
+or "lost"; a card of its own for the driving information, and following the position, come next.
+The reader is Linux only for now (the file's time comes from `stat()`).
 
 ## Going to a place by name
 
@@ -223,7 +282,7 @@ brightness step, so they share a letter; so do state borders and highways. Colou
 The program draws the area in `settings.json` (the sample is Wichita, Kansas). To look at weather
 elsewhere, change `location` and `zoom_km` there. Stronger rain is brighter (so it also reads with
 `--no-color`); in colour it follows the weather scale: pale blue, green, yellow,
-orange, red, magenta. The line at the top left says how the radar is doing. Normally it gives the time of the radar's
+orange, red, magenta. The last line of the view card (top right) says how the radar is doing. Normally it gives the time of the radar's
 own scan ("radar: scan 05:18 (11:18Z), 1 min old": local time, then UTC), and marks the picture
 "(old)" when it is older than the refresh time; otherwise it says it is asking, or why an update failed
 and when it will try again.
@@ -233,7 +292,7 @@ and when it will try again.
 NOAA's radar covers the continental United States and a margin, 20 to 55 degrees north and 130 to 60
 degrees west. The program asks for a picture of only the part of the view inside that area (so a
 picture is never labelled with more than it shows), and nothing at all when the view is wholly outside
-it; the line at the top then says "radar: none here". The view cannot be centred nearer than 80
+it; the radar line of the view card then says "radar: none here". The view cannot be centred nearer than 80
 degrees to a pole: the map is the usual web map (Mercator), which stretches without limit toward the
 poles, so that near them a screen wider than the earth would show the world repeated.
 
@@ -284,7 +343,7 @@ They cover the View (scale, cell shape, north up, rotation, round trips, pan, zo
 loader (good, missing, damaged, wrong type, out of range), the request policy (with a made-up
 clock), the fetcher (pacing, backoff, the hourly limit, timeouts, size limit, cancelling), the
 PNG reader, the colour scale, the worker thread, the picture cache, what is kept on disk, the keys and the base map (its file format, the
-ring simplifier, filling land and water into cells, and known places on the real file). The fetch tests talk to a small server on your own machine; nothing goes to the
+ring simplifier, filling land and water into cells, and known places on the real file). The GPS reader has tests too (the file's layout, with files made by rasfled2's real writer; damaged, cut-off and odd files; and every state, with a made-up clock and files whose times are set by hand). The cards have tests too: the frame and its size, wrapping, each corner, stacking, what each card says, the rain card's strip, and when the keys and notes cards come and go. The fetch tests talk to a small server on your own machine; nothing goes to the
 internet.
 
 `tests/data/` holds the PNG test pictures, made by `tests/make_png_fixtures.py` (it needs Pillow,

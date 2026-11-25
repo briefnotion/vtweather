@@ -61,6 +61,15 @@ void draw_radar(const CellGrid& grid, const RadarFrame& frame, LayerBlend& blend
     }
 }
 
+std::vector<RainLook> legend_looks() {
+    std::vector<RainLook> looks;
+    for (int i = 0; i < LEGEND_WIDTH; i++)
+        looks.push_back(rain_look((int)std::lround(FAINTEST_DBZ + (STRONGEST_DBZ - FAINTEST_DBZ) * i / (LEGEND_WIDTH - 1))));
+    return looks;
+}
+
+// Retired: the key to the rain is now a card (cards.h), drawn from legend_looks().
+#if 0
 void draw_legend(vtscreen::Picture& picture) {
     if (picture.cols < LEGEND_MIN_COLS || picture.bar_row() < LEGEND_MIN_ROWS) return;
     const int left = picture.cols - LEGEND_WIDTH - 1;
@@ -81,5 +90,7 @@ void draw_legend(vtscreen::Picture& picture) {
     words.replace(LEGEND_WIDTH - heavy.size(), heavy.size(), heavy);
     picture.text(strip - 1, left, words, 190, 190, 190);
 }
+
+#endif
 
 }  // namespace vtw

@@ -111,38 +111,6 @@ void draw_tests() {
     for (const vtscreen::PicCell& c : empty.cell) CHECK(c.lum == 0);
 }
 
-void legend_tests() {
-    vtscreen::Picture picture;
-    picture.init(30, 100);
-    vtw::draw_legend(picture);
-    const int strip = picture.bar_row() - 1;
-    const int left = picture.cols - vtw::LEGEND_WIDTH - 1;
-    // a strip of rain cells from light to heavy, brighter along it, as the rain itself is drawn
-    double before = 0;
-    for (int i = 0; i < vtw::LEGEND_WIDTH; i++) {
-        const vtscreen::PicCell& c = picture.at(strip, left + i);
-        CHECK(!c.text && c.lum >= before && c.lum > 0.3 && c.shimmer == 0);
-        before = c.lum;
-    }
-    CHECK_NEAR(picture.at(strip, left).lum, vtw::rain_look(5).brightness, 1e-12);
-    CHECK_NEAR(picture.at(strip, left + vtw::LEGEND_WIDTH - 1).lum, vtw::rain_look(60).brightness, 1e-12);
-    CHECK(picture.at(strip, left + 14).g != picture.at(strip, left).g || picture.at(strip, left + 14).r != picture.at(strip, left).r);   // the colour changes
-    // the words above, and the right edge and the status bar left alone
-    std::string words;
-    for (int c = 0; c < picture.cols; c++) words += picture.at(strip - 1, c).text ? (char)picture.at(strip - 1, c).ch : ' ';
-    CHECK(words.find("light rain") != std::string::npos && words.find("heavy") != std::string::npos);
-    CHECK(words.find("light rain") < words.find("heavy"));
-    CHECK(!picture.at(strip, picture.cols - 1).lum && picture.at(strip, picture.cols - 1).lum == 0);
-    for (int c = 0; c < picture.cols; c++) CHECK(!picture.at(picture.bar_row(), c).text && picture.at(picture.bar_row(), c).lum == 0);
-    // too small a screen: nothing
-    for (const std::pair<int, int>& size : {std::pair<int, int>{69, 30}, {100, 15}, {40, 20}}) {
-        vtscreen::Picture small;
-        small.init(size.second, size.first);
-        vtw::draw_legend(small);
-        for (const vtscreen::PicCell& c : small.cell) CHECK(!c.text && c.lum == 0);
-    }
-}
-
 // ---- the ground: water, land, and the lines on the land
 
 vtw::MapPolygon ground_square(double south, double west, double north, double east) {
@@ -396,7 +364,6 @@ int main() {
     grid_tests();
     look_tests();
     draw_tests();
-    legend_tests();
     ground_tests();
     blend_tests();
     if (failures == 0) std::printf("all drawing tests passed\n");

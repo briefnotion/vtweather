@@ -19,10 +19,12 @@
 #include <string>
 
 #include "basemap.h"
+#include "cards.h"
 #include "draw_grid.h"
 #include "draw_ground.h"
 #include "draw_places.h"
 #include "draw_radar.h"
+#include "gps_feed.h"
 #include "ground_map.h"
 #include "input.h"
 #include "layers.h"
@@ -65,6 +67,7 @@ int main(int argc, char** argv) {
     vtw::PlaceLabels places(basemap);
     vtw::UiState ui;
     vtw::KeyReader reader;
+    vtw::CardsState cards;                   // when the keys card and the notes card are shown
 
     // the folder for what is kept between runs (none with --no-cache or no home folder)
     const std::string cache_dir = no_cache ? "" : (settings.cache_dir.empty() ? vtw::default_cache_dir() : settings.cache_dir);
@@ -102,6 +105,8 @@ int main(int argc, char** argv) {
     vtw::RadarFeed radar(settings, cache_dir.empty() ? nullptr : &store, unix_at_start);
     radar.set_offline(offline);
 
+    vtw::GpsFeed gps(settings.gps_file);       // the car's position, from the file rasfled2 writes
+
     vtscreen::Display display;
     display.open(options, cols, rows);
     display.start();
@@ -121,6 +126,7 @@ int main(int argc, char** argv) {
         for (char c; (c = display.next_key()) != 0;) reader.feed(c);
         reader.flush();
         for (vtw::Key key; reader.next(key);) {
+            cards.key_pressed(t);
             if (ui.prompt.active) vtw::prompt_key(ui.prompt, key, basemap, view);
             else vtw::apply_command(vtw::command_for_event(key), view, settings, ui);
         }
@@ -128,6 +134,8 @@ int main(int argc, char** argv) {
 
         // gather: a new radar picture, if one has arrived, and a request if it is time
         radar.update(view, t);
+        const double unix_now = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+        gps.update(unix_now);
 
         // output
         picture.init(rows - 1, cols);
@@ -142,8 +150,9 @@ int main(int argc, char** argv) {
             vtw::draw_places(places, picture);
         }
         vtw::draw_marker(view, settings.home, picture);
-        vtw::draw_readout(view, settings, notes, radar.status(t), picture);
-        if (ui.legend && radar.has_frame() && !ui.prompt.active) vtw::draw_legend(picture);
+        vtw::draw_cards(picture, view, settings, notes, radar.status(t), cards.help_visible(t, ui.prompt.active),
+                        cards.notes_visible(notes), ui.legend && radar.has_frame() && !ui.prompt.active,
+                        vtw::gps_status_text(gps, unix_now));
         vtw::draw_prompt(ui.prompt, basemap, picture);
         display.bar(picture, info, t, true);
 

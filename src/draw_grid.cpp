@@ -69,6 +69,8 @@ void draw_marker(const View& view, GeoPoint place, vtscreen::Picture& picture) {
     picture.text((int)row, (int)col, "+", 255, 220, 90);
 }
 
+// Retired: the readout in the top left is now the cards (cards.h).
+#if 0
 void draw_readout(const View& view, const Settings& settings, const std::string& notes,
                   const std::string& radar_status, vtscreen::Picture& picture) {
     char line[160];
@@ -93,5 +95,7 @@ void draw_readout(const View& view, const Settings& settings, const std::string&
         start = end + 1;
     }
 }
+
+#endif
 
 }  // namespace vtw

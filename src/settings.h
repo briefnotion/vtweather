@@ -15,6 +15,9 @@ namespace vtw {
 // a free service. Whatever the file says, the refresh is never shorter than this.
 constexpr int MIN_REFRESH_MINUTES = 5;
 
+// Where the GPS position is read from (see gps_feed.h): a file in memory that rasfled2 keeps up to date.
+constexpr const char* DEFAULT_GPS_FILE = "/dev/shm/exchange/gps.json";
+
 struct Settings {
     std::string place_name = "Wichita, Kansas (sample)";
     GeoPoint home{37.69, -97.34};
@@ -24,6 +27,7 @@ struct Settings {
     std::string contact;              // for the User-Agent, optional
     bool remember_view = true;        // start where you were looking last time (r still goes home)
     std::string cache_dir;            // where radar pictures and the last view are kept; "" = the usual place
+    std::string gps_file = DEFAULT_GPS_FILE;   // the file the GPS position is read from; "" = no GPS
     std::string source = "built-in defaults";   // the file the settings came from
 };
 

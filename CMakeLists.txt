@@ -22,9 +22,20 @@ if(NOT CURL_FOUND)
 endif()
 find_package(Threads REQUIRED)
 
+# Strict: every warning is an error, for the program and the tests alike. This is how rasfled2 is built.
+# -DVTWEATHER_STRICT=OFF keeps the warnings but lets the build finish (a newer compiler may warn about
+# something an older one did not).
+option(VTWEATHER_STRICT "Treat every compiler warning as an error" ON)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options(-Wall -Wextra)
+    if(VTWEATHER_STRICT)
+        add_compile_options(-Werror)
+    endif()
+endif()
+
 set(VTWEATHER_SOURCES src/settings.cpp src/view.cpp src/draw_grid.cpp src/request_policy.cpp src/fetch.cpp src/inflate.cpp src/png.cpp src/radar_frame.cpp src/radar_source.cpp src/radar_worker.cpp
     src/radar_scheduler.cpp src/radar_cache.cpp src/store.cpp src/radar_feed.cpp src/cell_grid.cpp src/draw_radar.cpp src/input.cpp src/basemap.cpp src/ground_map.cpp src/draw_ground.cpp
-    src/place_labels.cpp src/draw_places.cpp src/keys.cpp src/prompt.cpp src/layers.cpp)
+    src/place_labels.cpp src/draw_places.cpp src/keys.cpp src/prompt.cpp src/layers.cpp src/card.cpp src/cards.cpp src/gps_feed.cpp)
 
 set(VTWEATHER_SOURCES_NO_MAIN ${VTWEATHER_SOURCES})
 add_executable(vtweather src/main.cpp ${VTWEATHER_SOURCES})
@@ -33,9 +44,6 @@ target_include_directories(vtweather PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 # where to look for data/basemap.bin when it is not in the folder you run from
 target_compile_definitions(vtweather PRIVATE VTW_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(vtweather PRIVATE nlohmann_json::nlohmann_json CURL::libcurl Threads::Threads)
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(vtweather PRIVATE -Wall -Wextra)
-endif()
 
 # tests: cmake --build build && ctest --test-dir build --output-on-failure
 # Only wanted when developing: -DVTWEATHER_TESTS=OFF skips the test programs (and the map
@@ -121,4 +129,17 @@ add_test(NAME vtweather_prompt_tests COMMAND vtweather_prompt_tests)
 add_executable(vtweather_library_tests tests/library_tests.cpp)
 target_include_directories(vtweather_library_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 add_test(NAME vtweather_library_tests COMMAND vtweather_library_tests)
+
+# the cards: the frame, wrapping, corners, stacking, what each says and when they come and go
+add_executable(vtweather_card_tests tests/card_tests.cpp src/card.cpp src/cards.cpp src/view.cpp src/draw_radar.cpp src/cell_grid.cpp
+               src/radar_frame.cpp src/png.cpp src/inflate.cpp src/layers.cpp)
+target_include_directories(vtweather_card_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+add_test(NAME vtweather_card_tests COMMAND vtweather_card_tests)
+
+# the GPS reader: the file's layout, how fresh it is, damaged files, and the real writer's output
+add_executable(vtweather_gps_tests tests/gps_tests.cpp src/gps_feed.cpp)
+target_include_directories(vtweather_gps_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_definitions(vtweather_gps_tests PRIVATE VTW_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
+target_link_libraries(vtweather_gps_tests PRIVATE nlohmann_json::nlohmann_json)
+add_test(NAME vtweather_gps_tests COMMAND vtweather_gps_tests)
 endif()  # VTWEATHER_TESTS
