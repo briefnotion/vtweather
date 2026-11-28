@@ -35,6 +35,9 @@ constexpr double ROADS_BELOW_KM = 250;
 // until a level whose land layer covers everything on screen. -1 if the map has no land layer.
 int choose_detail(const BaseMap& map, const View& view);
 
+// The layer of a kind at a level of detail, or null if the map has none.
+const MapLayer* find_layer(const BaseMap& map, LayerKind kind, int detail);
+
 class GroundMap {
 public:
     explicit GroundMap(const BaseMap& map) : map_(map) {}

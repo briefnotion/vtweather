@@ -8,12 +8,15 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# The two libraries are git submodules: vtscreen/ and third_party/json/
+# The libraries are git submodules: vtscreen/, vtpen/ (the pen that draws the map's lines) and third_party/json/
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vtscreen/vtscreen.h" OR
+   NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vtpen/include/vtpen.h" OR
    NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/json/CMakeLists.txt")
     message(FATAL_ERROR "A library is missing. The libraries are git submodules; run:\n"
                         "    git submodule update --init")
 endif()
+# vtpen is headers only; vtscreen includes them (when it finds them) to draw shapes as ReGIS lines or Sixel pixels
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/vtpen/include")
 add_subdirectory(third_party/json)          # nlohmann_json::nlohmann_json (settings, API replies)
 find_package(CURL)                          # fetching from the web (libcurl, and its development files)
 if(NOT CURL_FOUND)
@@ -35,7 +38,7 @@ endif()
 
 set(VTWEATHER_SOURCES src/settings.cpp src/view.cpp src/draw_grid.cpp src/request_policy.cpp src/fetch.cpp src/inflate.cpp src/png.cpp src/radar_frame.cpp src/radar_source.cpp src/radar_worker.cpp
     src/radar_scheduler.cpp src/radar_cache.cpp src/store.cpp src/radar_feed.cpp src/cell_grid.cpp src/draw_radar.cpp src/input.cpp src/basemap.cpp src/ground_map.cpp src/draw_ground.cpp
-    src/place_labels.cpp src/draw_places.cpp src/keys.cpp src/prompt.cpp src/layers.cpp src/card.cpp src/cards.cpp src/gps_feed.cpp src/car.cpp src/orientation.cpp)
+    src/place_labels.cpp src/draw_places.cpp src/keys.cpp src/prompt.cpp src/layers.cpp src/card.cpp src/cards.cpp src/gps_feed.cpp src/car.cpp src/orientation.cpp src/pen_map.cpp src/pen_support.cpp)
 
 set(VTWEATHER_SOURCES_NO_MAIN ${VTWEATHER_SOURCES})
 add_executable(vtweather src/main.cpp ${VTWEATHER_SOURCES})
@@ -111,6 +114,13 @@ add_executable(vtweather_ground_tests tests/ground_tests.cpp src/basemap.cpp src
 target_include_directories(vtweather_ground_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_definitions(vtweather_ground_tests PRIVATE VTW_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
 add_test(NAME vtweather_ground_tests COMMAND vtweather_ground_tests)
+
+# the pen map: the map's lines as pen lines, kept clear of text, and what the terminal's answers lead to
+add_executable(vtweather_pen_tests tests/pen_tests.cpp src/pen_map.cpp src/pen_support.cpp src/draw_ground.cpp src/ground_map.cpp src/layers.cpp src/basemap.cpp src/view.cpp src/input.cpp src/keys.cpp src/prompt.cpp src/settings.cpp)
+target_include_directories(vtweather_pen_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_definitions(vtweather_pen_tests PRIVATE VTW_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data" VTW_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(vtweather_pen_tests PRIVATE nlohmann_json::nlohmann_json)
+add_test(NAME vtweather_pen_tests COMMAND vtweather_pen_tests)
 
 # city names: which to show, and where
 add_executable(vtweather_places_tests tests/places_tests.cpp src/place_labels.cpp src/basemap.cpp src/view.cpp)

@@ -16,12 +16,6 @@ bool overlaps(const GeoBox& a, const GeoBox& b) {
     return a.south <= b.north && a.north >= b.south && a.west <= b.east && a.east >= b.west;
 }
 
-const MapLayer* find_layer(const BaseMap& map, LayerKind kind, int detail) {
-    for (const MapLayer& layer : map.layers)
-        if (layer.kind == kind && layer.detail == detail) return &layer;
-    return nullptr;
-}
-
 // Fill the cells inside a polygon (even-odd over all its rings) with a value.
 class Filler {
 public:
@@ -120,6 +114,12 @@ private:
 };
 
 }  // namespace
+
+const MapLayer* find_layer(const BaseMap& map, LayerKind kind, int detail) {
+    for (const MapLayer& layer : map.layers)
+        if (layer.kind == kind && layer.detail == detail) return &layer;
+    return nullptr;
+}
 
 int choose_detail(const BaseMap& map, const View& view) {
     int wanted = view.zoom_km() >= MEDIUM_DETAIL_BELOW_KM ? 0 : (view.zoom_km() >= FINE_DETAIL_BELOW_KM ? 1 : 2);

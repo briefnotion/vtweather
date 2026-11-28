@@ -16,6 +16,7 @@ Command command_for_key(char key) {
         case 'k': case 'K': return Command::ToggleLegend;
         case 'f': case 'F': return Command::ToggleFollow;
         case 'h': case 'H': return Command::ToggleHeadingUp;
+        case 'p': case 'P': return Command::TogglePen;
         case '/': case 'l': case 'L': return Command::OpenGoto;
         default: return Command::None;
     }
@@ -51,6 +52,7 @@ void apply_command(Command command, View& view, const Settings& settings, UiStat
         case Command::OpenGoto: ui.prompt = PromptState(); ui.prompt.active = true; break;
         case Command::ToggleFollow: ui.follow = !ui.follow; break;
         case Command::ToggleHeadingUp: ui.heading_up = !ui.heading_up; break;
+        case Command::TogglePen: ui.pen = !ui.pen; break;
         case Command::None: break;
     }
 }

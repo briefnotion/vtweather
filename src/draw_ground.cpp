@@ -35,7 +35,7 @@ void set_water(vtscreen::PicCell& cell) {
 
 }  // namespace
 
-void draw_ground(const GroundMap& ground, vtscreen::Picture& picture, LayerBlend& blend) {
+void draw_ground(const GroundMap& ground, vtscreen::Picture& picture, LayerBlend& blend, bool lines) {
     for (int row = 0; row < ground.rows(); row++)
         for (int col = 0; col < ground.cols(); col++) {
             vtscreen::PicCell& cell = picture.at(row, col);
@@ -45,6 +45,7 @@ void draw_ground(const GroundMap& ground, vtscreen::Picture& picture, LayerBlend
                 set_water(cell);
                 continue;
             }
+            if (!lines) continue;
             // Every line in the cell is a layer of its own (the two kinds of border, and the two of road, are one
             // layer each: the brighter kind is the one drawn).
             if (kind == Ground::Coast) blend.add(row, col, Layer::Coast, COAST_BRIGHTNESS, 190, 170, 120);

@@ -14,6 +14,7 @@ namespace vtw {
 
 // The lines go in through the LayerBlend (each is a layer), so where they overlap each other, or the
 // grid or the rain, the cell shows it (see layers.h).
-void draw_ground(const GroundMap& ground, vtscreen::Picture& picture, LayerBlend& blend);
+// With lines = false only the water is drawn: the coast, borders, rivers and roads are drawn another way (the pen map).
+void draw_ground(const GroundMap& ground, vtscreen::Picture& picture, LayerBlend& blend, bool lines = true);
 
 }  // namespace vtw

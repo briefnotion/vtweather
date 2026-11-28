@@ -14,6 +14,7 @@
 //   g           show or hide the grid of latitude and longitude lines
 //   n           show or hide the city names
 //   k           show or hide the key to the rain
+//   p           the map's lines (coast, borders, rivers, roads) drawn with the pen, or as letters (see pen_map.h)
 #pragma once
 
 #include "keys.h"
@@ -23,7 +24,7 @@
 
 namespace vtw {
 
-enum class Command { None, ZoomIn, ZoomOut, PanLeft, PanRight, PanUp, PanDown, Reset, ToggleGraticule, ToggleNames, ToggleLegend, OpenGoto, ToggleFollow, ToggleHeadingUp };
+enum class Command { None, ZoomIn, ZoomOut, PanLeft, PanRight, PanUp, PanDown, Reset, ToggleGraticule, ToggleNames, ToggleLegend, OpenGoto, ToggleFollow, ToggleHeadingUp, TogglePen };
 
 // What is shown, apart from where the view is.
 struct UiState {
@@ -32,6 +33,7 @@ struct UiState {
     bool legend = true;
     bool follow = false;               // the map follows the car (f); not remembered between runs
     bool heading_up = false;           // the map turns so the car's direction is up (h), when following and moving
+    bool pen = true;                   // the map's lines drawn with the pen (p), when the terminal can show it; else letters
     PromptState prompt;                // the go-to prompt, when it is open
 };
 

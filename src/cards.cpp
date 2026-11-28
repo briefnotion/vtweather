@@ -49,9 +49,9 @@ Card help_card() {
         keyed("f", "follow", text),
         keyed("h", "heading up", text),
         keyed("r", "reset", text),
-        keyed("g", "grid", text),
-        keyed("n", "names", text),
+        keyed("g n", "grid, names", text),
         keyed("k", "key", text),
+        keyed("p", "pen map", text),
         keyed("q", "quit", text),
     };
     return card;

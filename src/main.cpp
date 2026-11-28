@@ -22,6 +22,8 @@
 #include "cards.h"
 #include "draw_grid.h"
 #include "draw_ground.h"
+#include "pen_map.h"
+#include "pen_support.h"
 #include "draw_places.h"
 #include "draw_radar.h"
 #include "car.h"
@@ -45,6 +47,7 @@ int main(int argc, char** argv) {
     const std::string basemap_path = vtw::take_settings_option(argc, argv, "--basemap");
     const bool offline = vtw::take_flag(argc, argv, "--offline");
     const bool no_cache = vtw::take_flag(argc, argv, "--no-cache");
+    const bool no_pen = vtw::take_flag(argc, argv, "--no-pen");
     vtscreen::Options options;
     int rc = vtscreen::parse_options(argc, argv, options);
     if (rc >= 0) return rc;
@@ -54,6 +57,13 @@ int main(int argc, char** argv) {
     }
     int cols, rows;
     if (!vtscreen::resolve_size(options, cols, rows)) return 1;
+
+    // What the terminal can draw the map's lines with (ReGIS, else Sixel, else letters). Asked once, before the screen is
+    // taken over; --no-pen skips it. vtscreen is told, and the Display uses it when it is opened. With --no-color the lines are
+    // white (a monochrome screen): the Display is told that its pictures suit that, so it shows them anyway.
+    vtw::PenSupport pen_support;
+    if (!no_pen) pen_support = vtw::detect_pen_support(cols, rows - 1);
+    vtw::apply_pen_support(pen_support);
 
     std::string notes;
     const vtw::Settings settings = vtw::load_settings(settings_path, notes);
@@ -67,6 +77,7 @@ int main(int argc, char** argv) {
     }
     vtw::GroundMap ground(basemap);
     vtw::PlaceLabels places(basemap);
+    vtw::PenMap pen_map(basemap);
     vtw::UiState ui;
     vtw::KeyReader reader;
     vtw::CardsState cards;                   // when the keys card and the notes card are shown
@@ -113,6 +124,7 @@ int main(int argc, char** argv) {
     vtw::Car car(settings.moving_mph);         // what the map shows of it: an arrow when moving, a + (held in place) when slow
 
     vtscreen::Display display;
+    display.pictures_without_colour = true;           // the pen map is white without colour
     display.open(options, cols, rows);
     display.start();
     const vtscreen::Info info{"vtweather", 0.0, {90, 160, 220}};
@@ -153,7 +165,9 @@ int main(int argc, char** argv) {
         const vtw::CellGrid grid(view);
         vtw::LayerBlend blend(picture);               // where layers overlap, the cell shows it
         ground.update(view);
-        vtw::draw_ground(ground, picture, blend);
+        // the lines of the map: with the pen where the terminal can show it (and it covers the map), else letters
+        const bool pen_on = ui.pen && vtw::pen_covers(pen_support, view.cols(), view.rows());
+        vtw::draw_ground(ground, picture, blend, !pen_on);
         if (ui.graticule) vtw::draw_graticule(view, grid, picture, blend);
         vtw::draw_radar(grid, radar.frame(), blend);
         if (ui.names) {
@@ -167,6 +181,7 @@ int main(int argc, char** argv) {
                         cards.notes_visible(notes), ui.legend && radar.has_frame() && !ui.prompt.active,
                         ui.prompt.active ? nullptr : &driving, ui.heading_up);
         vtw::draw_prompt(ui.prompt, basemap, picture);
+        pen_map.update(view, picture, pen_support.cell_w, pen_support.cell_h, t, pen_on, !options.color);       // after all the text is on the picture
         display.bar(picture, info, t, true);
 
         // show, then wait for the next frame
