@@ -44,7 +44,7 @@ It needs an internet connection for the radar. Without one it still draws the ma
         cd ~/vtweather && git pull && git submodule update --init && cmake --build build -j4
 
 - **Nothing happens, or it says a library is missing:** `git submodule update --init` fetches
-  the two libraries if the clone missed them, and the apt line above installs the rest.
+  the libraries if the clone missed them, and the apt line above installs the rest.
 
 ## Build and run
 
@@ -59,7 +59,7 @@ clone with `--recursive`:
     ./build/vtweather             (q quits; also --settings FILE, --offline, --no-cache, --no-color,
                                    --fps N, --cols N --rows N)
 
-If `vtscreen/` or `third_party/json/` is empty, run `git submodule update --init`.
+If `vtscreen/`, `vtpen/` or `third_party/json/` is empty, run `git submodule update --init`.
 `-DVTWEATHER_TESTS=OFF` on the first `cmake` line leaves out the test programs and the map
 maker (see "Tests").
 
@@ -133,6 +133,7 @@ checksum) and refuses anything odd with a reason, since the pictures come off th
 | `g` | show or hide a grid of latitude and longitude lines |
 | `n` | show or hide the city names |
 | `k` | show or hide the rain card, the key to the rain (a strip from light to heavy, in the lower right) |
+| `p` | draw the map's lines (coast, borders, rivers, roads) with the pen, or as letters (see "The pen map"); only where the terminal can show the pen's lines |
 | `q` | quit |
 
 Any key press also brings the keys card back for 30 seconds (see "The cards").
@@ -315,6 +316,31 @@ To remake the file (only needed if the map data changes):
     ./tools/get_natural_earth.sh                          downloads the GeoJSON (about 125 MB, the roads being 50 of it), once, politely
     ./build/make_basemap tools/natural_earth data/basemap.bin
 
+## The pen map
+
+Where the terminal can show pictures, the map's lines (the coast and the shores of lakes, country and state borders, rivers,
+highways and other roads) are drawn as thin lines with [vtpen](https://github.com/briefnotion/vtpen), in the same colours, instead
+of as letters, which makes it look like a map. They are described as one vtpen `Drawing` the size of the map in pixels and given to
+vtscreen (`Picture::place_drawing`), whose Display draws it as **ReGIS** lines (DEC's vector graphics: small, quick; xterm built
+with ReGIS and run as a VT340, `xterm -ti 340`) or, on a terminal that does Sixel only, as pixels. Water stays a navy fill in the letter cells, and the
+letters stay for the rain, the city names, the cards and the car; the lines go over them. `p` switches between the pen's lines and the letters
+(`--no-pen` starts with the letters and does not ask the terminal what it can do). With `--no-color`, for a monochrome screen, the lines are all white
+(the letters lose their colour codes, as everywhere in the program).
+
+The terminal is asked once at start-up (vtpen's probe, about a second at most). ReGIS is used only if the terminal's ReGIS screen
+covers the whole map: it starts at the top left of the window and is never stretched, and xterm limits it to its `maxGraphicSize`
+(1000 x 1000 unless you raise it, for example `xterm -ti 340 -xrm 'XTerm*maxGraphicSize: 1920x1080' -xrm 'XTerm*regisScreenSize: 1920x1080'`,
+and `XTerm*allowWindowOps: true` so it tells the size of a character cell). If it does not cover the map but Sixel works, Sixel is used; if
+neither works, or the terminal does not answer, the map is letters, exactly as before.
+
+Lines never run through text: every cell that has a letter of the program's own in it (a card, a city name, the go-to prompt, the car) is
+kept clear, and a line is cut where it would cross one. A line along the edge of what a level of the map file covers (where the file was cut) is
+not drawn as a coast. Which lines show follows the zoom, as for the letters (roads below 250 km across, highways below 1000), and the
+level of detail too. The lines are made again only when the view, the size of the window or those cells change, and at most ten
+times a second, so a map that is moving is not sent faster than that. A letter written into a cell takes that cell's pixels with it, so
+vtscreen writes again the letters where the old lines were when the lines change, then draws the new ones in one piece. Scrolling the
+terminal with a ReGIS picture on screen is slow in xterm, but this program never scrolls.
+
 ## Where things overlap
 
 Rivers, roads, borders, the coast, the grid and the rain are layers. A cell with one of them holds its
@@ -401,7 +427,9 @@ They cover the View (scale, cell shape, north up, rotation, round trips, pan, zo
 loader (good, missing, damaged, wrong type, out of range), the request policy (with a made-up
 clock), the fetcher (pacing, backoff, the hourly limit, timeouts, size limit, cancelling), the
 PNG reader, the colour scale, the worker thread, the picture cache, what is kept on disk, the keys and the base map (its file format, the
-ring simplifier, filling land and water into cells, and known places on the real file). The GPS reader has tests too (the file's layout, with files made by rasfled2's real writer; damaged, cut-off and odd files; and every state, with a made-up clock and files whose times are set by hand). So do the car (when it counts as moving, holding the position, the arrow and where it is drawn) and the pretend GPS (its drive, the drift, the tunnel, and its file read back by the real reader). The cards have tests too: the frame and its size, wrapping, each corner, stacking, what each card says, the rain card's strip, and when the keys and notes cards come and go. The fetch tests talk to a small server on your own machine; nothing goes to the
+ring simplifier, filling land and water into cells, and known places on the real file), and the pen map (cutting lines to the screen and around text,
+checked against a plain sampling of random lines and masks; the drawing from made-up shapes and from the real file; which lines at which zoom; how often it is made;
+what the terminal's answers lead to). The GPS reader has tests too (the file's layout, with files made by rasfled2's real writer; damaged, cut-off and odd files; and every state, with a made-up clock and files whose times are set by hand). So do the car (when it counts as moving, holding the position, the arrow and where it is drawn) and the pretend GPS (its drive, the drift, the tunnel, and its file read back by the real reader). The cards have tests too: the frame and its size, wrapping, each corner, stacking, what each card says, the rain card's strip, and when the keys and notes cards come and go. The fetch tests talk to a small server on your own machine; nothing goes to the
 internet.
 
 `tests/data/` holds the PNG test pictures, made by `tests/make_png_fixtures.py` (it needs Pillow,
@@ -418,6 +446,7 @@ mapping", start the program with `setarch x86_64 -R`).
 - [Natural Earth](https://www.naturalearthdata.com) (public domain): the land, lake, border, river, road and city data in `data/basemap.bin`. Natural
   Earth asks for no credit; "Made with Natural Earth" is its suggested line.
 - [vtscreen](https://github.com/briefnotion/vtscreen) (MIT), the drawing library, in `vtscreen/`.
+- [vtpen](https://github.com/briefnotion/vtpen) (MIT), the pen that draws the map's lines (and asks the terminal what it can show), in `vtpen/` (headers only).
 - [nlohmann/json](https://github.com/nlohmann/json) (MIT), in `third_party/json/`, pinned to
   release v3.12.0.
 
