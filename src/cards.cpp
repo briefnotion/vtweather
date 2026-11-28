@@ -1,4 +1,6 @@
 #include "cards.h"
+#include "rain_contours.h"
+#include "rain_style.h"
 
 #include <algorithm>
 #include <cmath>
@@ -84,6 +86,23 @@ Card legend_card() {
     return card;
 }
 
+Card pen_legend_card(bool white) {
+    Card card;
+    card.title = "rain";
+    const char* names[RAIN_BANDS] = {"light", "moderate", "heavy", "severe"};
+    const char* glyphs[RAIN_BANDS] = {"· · · ·", "- - - -", "───────", "═══════"};       // the styles the lines have without colour
+    for (int band = 0; band < RAIN_BANDS; band++) {
+        const RainStyle style = rain_style(band, white);
+        CardLine line;
+        line.key = white ? glyphs[band] : "───────";
+        line.text = names[band];
+        line.key_colour = {style.r, style.g, style.b};
+        line.text_colour = {170, 170, 170};
+        card.lines.push_back(line);
+    }
+    return card;
+}
+
 Card driving_card(GpsState state, const GpsFix& fix, const std::string& problem, double age_seconds, const Car& car,
                   bool following) {
     Card card;
@@ -131,8 +150,8 @@ Card driving_card(GpsState state, const GpsFix& fix, const std::string& problem,
 
 void draw_cards(vtscreen::Picture& picture, const View& view, const Settings& settings, const std::string& notes,
                 const std::string& radar_status, bool show_help, bool show_notes, bool show_legend,
-                const Card* driving, bool heading_up) {
-    const int rows_available = picture.bar_row() - CARDS_FREE_ROWS_AT_BOTTOM;
+                const Card* driving, bool heading_up, int pen_rain) {
+    const int rows_available = picture.bar_row() - (pen_rain != 0 ? std::max(CARDS_FREE_ROWS_AT_BOTTOM, PEN_LEGEND_ROWS) : CARDS_FREE_ROWS_AT_BOTTOM);
     int offset = 0;
     auto stack = [&](const Card& card) {
         const CardSize size = card_size(card, picture.cols);
@@ -143,7 +162,7 @@ void draw_cards(vtscreen::Picture& picture, const View& view, const Settings& se
     if (show_notes && !notes.empty()) stack(notes_card(notes));      // a warning is never the card left out
     if (show_help) stack(help_card());
     if (show_legend && picture.cols >= LEGEND_MIN_COLS && picture.bar_row() >= LEGEND_MIN_ROWS)
-        draw_card(picture, legend_card(), Corner::BottomRight, 0);
+        draw_card(picture, pen_rain == 0 ? legend_card() : pen_legend_card(pen_rain == 2), Corner::BottomRight, 0);
     if (driving != nullptr && !driving->lines.empty()) draw_card(picture, *driving, Corner::BottomLeft, 0);
 }
 

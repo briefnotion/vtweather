@@ -87,19 +87,24 @@ void tests() {
         feed.update(view, t);
         CHECK(has(feed.status(t), "asking"));
         CHECK(!feed.has_frame());
+        CHECK(feed.revision() == 0);                                // nothing shown yet
         CHECK(wait_for_status(feed, view, t, "just fetched"));
         CHECK(feed.has_frame() && !feed.failing());
         CHECK(feed.frame().width == 270 && feed.frame().height == 180);
         CHECK(server.requests() == 1);
+        const uint64_t first_revision = feed.revision();
+        CHECK(first_revision >= 1);                                 // a picture came: the revision moved
 
         for (t = 1; t < 299; t += 1) feed.update(view, t);          // covered, not yet time
         CHECK(server.requests() == 1);
+        CHECK(feed.revision() == first_revision);                   // the same picture: the same revision
         CHECK(has(feed.status(299), "min ago"));
 
         // the refresh time: a second request
         t = 300.5;
         CHECK(wait_for_requests(feed, view, t, server, 2));
         CHECK(has(feed.status(t), "just fetched"));
+        CHECK(feed.revision() > first_revision);                    // a newer picture: another revision
 
         // moving off the picture: nothing for the first moment, then a request
         vtw::View moved = view;

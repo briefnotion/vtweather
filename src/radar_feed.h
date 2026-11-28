@@ -43,6 +43,8 @@ public:
 
     bool has_frame() const { return (bool)current_; }
     const RadarFrame& frame() const { return current_ ? current_->frame : none_; }
+    // Changes whenever the picture shown is another one (so a drawing made from it can tell it is out of date).
+    uint64_t revision() const { return revision_; }
     size_t cached_pictures() const { return cache_.size(); }
     std::string status(double now) const;
     bool failing() const { return !error_.empty(); }       // the latest attempt did not work
@@ -61,6 +63,7 @@ private:
     RadarStore* store_;
     double unix_at_start_;
     bool offline_ = false;
+    uint64_t revision_ = 0;
     bool outside_ = false;
     std::string error_;
 };

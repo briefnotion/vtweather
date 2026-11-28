@@ -57,8 +57,10 @@ void RadarFeed::update(const View& view, double now) {
     if (outside_) return;
 
     // show the newest picture that covers it; if none does, keep showing what there is
+    const CachedPicture* before = current_.get();
     if (std::shared_ptr<const CachedPicture> best = cache_.best_for(wanted, now)) current_ = best;
     else if (!current_) current_ = cache_.best_for(RADAR_COVERAGE, now);
+    if (current_.get() != before) revision_++;
 
     if (offline_ || !worker_.can_request()) return;
     const bool covered = current_ && covers(current_->frame.box, wanted);

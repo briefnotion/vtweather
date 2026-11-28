@@ -38,7 +38,7 @@ endif()
 
 set(VTWEATHER_SOURCES src/settings.cpp src/view.cpp src/draw_grid.cpp src/request_policy.cpp src/fetch.cpp src/inflate.cpp src/png.cpp src/radar_frame.cpp src/radar_source.cpp src/radar_worker.cpp
     src/radar_scheduler.cpp src/radar_cache.cpp src/store.cpp src/radar_feed.cpp src/cell_grid.cpp src/draw_radar.cpp src/input.cpp src/basemap.cpp src/ground_map.cpp src/draw_ground.cpp
-    src/place_labels.cpp src/draw_places.cpp src/keys.cpp src/prompt.cpp src/layers.cpp src/card.cpp src/cards.cpp src/gps_feed.cpp src/car.cpp src/orientation.cpp src/pen_map.cpp src/pen_support.cpp)
+    src/place_labels.cpp src/draw_places.cpp src/keys.cpp src/prompt.cpp src/layers.cpp src/card.cpp src/cards.cpp src/gps_feed.cpp src/car.cpp src/orientation.cpp src/pen_map.cpp src/pen_support.cpp src/rain_contours.cpp src/rain_pen.cpp src/rain_style.cpp)
 
 set(VTWEATHER_SOURCES_NO_MAIN ${VTWEATHER_SOURCES})
 add_executable(vtweather src/main.cpp ${VTWEATHER_SOURCES})
@@ -116,11 +116,19 @@ target_compile_definitions(vtweather_ground_tests PRIVATE VTW_DATA_DIR="${CMAKE_
 add_test(NAME vtweather_ground_tests COMMAND vtweather_ground_tests)
 
 # the pen map: the map's lines as pen lines, kept clear of text, and what the terminal's answers lead to
-add_executable(vtweather_pen_tests tests/pen_tests.cpp src/pen_map.cpp src/pen_support.cpp src/draw_ground.cpp src/ground_map.cpp src/layers.cpp src/basemap.cpp src/view.cpp src/input.cpp src/keys.cpp src/prompt.cpp src/settings.cpp)
+add_executable(vtweather_pen_tests tests/pen_tests.cpp src/pen_map.cpp src/pen_support.cpp src/draw_ground.cpp src/ground_map.cpp src/layers.cpp src/basemap.cpp src/view.cpp src/input.cpp src/keys.cpp src/prompt.cpp src/settings.cpp src/rain_contours.cpp src/rain_pen.cpp src/rain_style.cpp src/radar_frame.cpp src/png.cpp src/inflate.cpp src/cell_grid.cpp)
 target_include_directories(vtweather_pen_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_definitions(vtweather_pen_tests PRIVATE VTW_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data" VTW_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(vtweather_pen_tests PRIVATE nlohmann_json::nlohmann_json)
 add_test(NAME vtweather_pen_tests COMMAND vtweather_pen_tests)
+
+# the rain as contour lines: the bands, following a level through a lattice, line styles, the pen drawing, tints, the key
+add_executable(vtweather_rain_tests tests/rain_tests.cpp src/pen_map.cpp src/pen_support.cpp src/draw_ground.cpp src/ground_map.cpp src/layers.cpp src/basemap.cpp src/view.cpp src/input.cpp src/keys.cpp src/prompt.cpp src/settings.cpp src/rain_contours.cpp src/rain_pen.cpp src/rain_style.cpp src/radar_frame.cpp src/png.cpp src/inflate.cpp src/cell_grid.cpp
+               src/card.cpp src/cards.cpp src/draw_radar.cpp src/car.cpp src/gps_feed.cpp)
+target_include_directories(vtweather_rain_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_definitions(vtweather_rain_tests PRIVATE VTW_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data" VTW_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data" VTW_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(vtweather_rain_tests PRIVATE nlohmann_json::nlohmann_json)
+add_test(NAME vtweather_rain_tests COMMAND vtweather_rain_tests)
 
 # city names: which to show, and where
 add_executable(vtweather_places_tests tests/places_tests.cpp src/place_labels.cpp src/basemap.cpp src/view.cpp)
@@ -146,7 +154,7 @@ target_include_directories(vtweather_library_tests PRIVATE "${CMAKE_CURRENT_SOUR
 add_test(NAME vtweather_library_tests COMMAND vtweather_library_tests)
 
 # the cards: the frame, wrapping, corners, stacking, what each says and when they come and go
-add_executable(vtweather_card_tests tests/card_tests.cpp src/card.cpp src/cards.cpp src/view.cpp src/draw_radar.cpp src/cell_grid.cpp
+add_executable(vtweather_card_tests tests/card_tests.cpp src/card.cpp src/cards.cpp src/view.cpp src/draw_radar.cpp src/cell_grid.cpp src/rain_style.cpp
                src/radar_frame.cpp src/png.cpp src/inflate.cpp src/layers.cpp src/car.cpp src/gps_feed.cpp)
 target_include_directories(vtweather_card_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(vtweather_card_tests PRIVATE nlohmann_json::nlohmann_json)

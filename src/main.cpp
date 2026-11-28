@@ -24,6 +24,7 @@
 #include "draw_ground.h"
 #include "pen_map.h"
 #include "pen_support.h"
+#include "rain_pen.h"
 #include "draw_places.h"
 #include "draw_radar.h"
 #include "car.h"
@@ -169,7 +170,12 @@ int main(int argc, char** argv) {
         const bool pen_on = ui.pen && vtw::pen_covers(pen_support, view.cols(), view.rows());
         vtw::draw_ground(ground, picture, blend, !pen_on);
         if (ui.graticule) vtw::draw_graticule(view, grid, picture, blend);
-        vtw::draw_radar(grid, radar.frame(), blend);
+        // the rain: letters, or with the pen contour lines (and in colour a dim tint under them)
+        if (pen_on) {
+            if (options.color) vtw::draw_rain_tints(grid, radar.frame(), picture);
+        } else {
+            vtw::draw_radar(grid, radar.frame(), blend);
+        }
         if (ui.names) {
             places.update(view);
             vtw::draw_places(places, picture);
@@ -179,9 +185,9 @@ int main(int argc, char** argv) {
         const vtw::Card driving = vtw::driving_card(gps.state(), gps.fix(), gps.problem(), gps.age(unix_now), car, ui.follow);
         vtw::draw_cards(picture, view, settings, notes, radar.status(t), cards.help_visible(t, ui.prompt.active),
                         cards.notes_visible(notes), ui.legend && radar.has_frame() && !ui.prompt.active,
-                        ui.prompt.active ? nullptr : &driving, ui.heading_up);
+                        ui.prompt.active ? nullptr : &driving, ui.heading_up, pen_on ? (options.color ? 1 : 2) : 0);
         vtw::draw_prompt(ui.prompt, basemap, picture);
-        pen_map.update(view, picture, pen_support.cell_w, pen_support.cell_h, t, pen_on, !options.color);       // after all the text is on the picture
+        pen_map.update(view, picture, pen_support.cell_w, pen_support.cell_h, t, pen_on, !options.color, &radar.frame(), radar.revision());       // after all the text is on the picture
         display.bar(picture, info, t, true);
 
         // show, then wait for the next frame

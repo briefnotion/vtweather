@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "ground_map.h"
+#include "rain_pen.h"
 
 namespace vtw {
 
@@ -204,7 +205,7 @@ PenStyle pen_style(LayerKind kind) {
 
 PenStyle pen_style_coast() { return {190, 170, 120, 1}; }
 
-std::shared_ptr<const vtpen::Drawing> make_pen_map(const BaseMap& map, const View& view, int cell_w, int cell_h, const Blocked& blocked, bool white) {
+std::shared_ptr<const vtpen::Drawing> make_pen_map(const BaseMap& map, const View& view, int cell_w, int cell_h, const Blocked& blocked, bool white, const RainContours* rain) {
     if (cell_w <= 0 || cell_h <= 0 || view.cols() <= 0 || view.rows() <= 0) return nullptr;
     auto drawing = std::make_shared<vtpen::Drawing>(view.cols() * cell_w, view.rows() * cell_h);
     const int detail = choose_detail(map, view);
@@ -217,6 +218,9 @@ std::shared_ptr<const vtpen::Drawing> make_pen_map(const BaseMap& map, const Vie
         mask = &all_clear;
     }
     LineAdder adder(*drawing, view.cols(), view.rows(), cell_w, cell_h, *mask, white);
+
+    // the rain first, light to severe, so the map's lines are on top of it
+    if (rain) draw_rain_lines(*drawing, *rain, view.cols(), view.rows(), cell_w, cell_h, *mask, white);
 
     // lowest first, so what is drawn later is on top: rivers, roads, highways, the coast, state borders, country borders
     if (const MapLayer* layer = find_layer(map, LayerKind::River, detail)) { adder.style(pen_style(LayerKind::River)); add_lines(*layer, view, screen, adder); }
@@ -232,18 +236,36 @@ std::shared_ptr<const vtpen::Drawing> make_pen_map(const BaseMap& map, const Vie
     return drawing;
 }
 
-void PenMap::update(const View& view, vtscreen::Picture& picture, int cell_w, int cell_h, double now, bool on, bool white) {
+void PenMap::update(const View& view, vtscreen::Picture& picture, int cell_w, int cell_h, double now, bool on, bool white,
+                    const RadarFrame* radar, uint64_t radar_id) {
+    const bool rain = radar != nullptr && radar->width > 0;
     if (!on || cell_w <= 0 || cell_h <= 0) {
         drawing_.reset();
         have_ = false;
         return;
     }
-    const bool same_size = have_ && cols_ == view.cols() && rows_ == view.rows() && cell_w_ == cell_w && cell_h_ == cell_h && white_ == white;
+    const bool same_size = have_ && cols_ == view.cols() && rows_ == view.rows() && cell_w_ == cell_w && cell_h_ == cell_h && white_ == white &&
+                           have_rain_ == rain && (!rain || radar_id_ == radar_id);
     Blocked blocked = blocked_cells(picture, view.cols(), view.rows());
     const bool same = same_size && centre_.lat == view.centre().lat && centre_.lon == view.centre().lon && zoom_ == view.zoom_km() &&
                       aspect_ == view.cell_aspect() && heading_ == view.heading() && blocked == blocked_;
     if (!same && (!same_size || now - made_at_ >= PEN_MAP_MIN_SECONDS)) {
-        drawing_ = make_pen_map(map_, view, cell_w, cell_h, blocked, white);
+        const RainContours* contours = nullptr;
+        if (rain) {                                                                 // the rain's lines depend on the view and the picture, not on the text
+            const bool same_contours = have_contours_ && contours_radar_id_ == radar_id && contours_cols_ == view.cols() && contours_rows_ == view.rows() &&
+                                       contours_centre_.lat == view.centre().lat && contours_centre_.lon == view.centre().lon && contours_zoom_ == view.zoom_km() &&
+                                       contours_aspect_ == view.cell_aspect() && contours_heading_ == view.heading();
+            if (!same_contours) {
+                contours_ = make_rain_contours(*radar, view);
+                contours_made_++;
+                have_contours_ = true; contours_radar_id_ = radar_id;
+                contours_cols_ = view.cols(); contours_rows_ = view.rows();
+                contours_centre_ = view.centre(); contours_zoom_ = view.zoom_km(); contours_aspect_ = view.cell_aspect(); contours_heading_ = view.heading();
+            }
+            contours = &contours_;
+        }
+        drawing_ = make_pen_map(map_, view, cell_w, cell_h, blocked, white, contours);
+        have_rain_ = rain; radar_id_ = radar_id;
         cols_ = view.cols(); rows_ = view.rows(); cell_w_ = cell_w; cell_h_ = cell_h; white_ = white;
         centre_ = view.centre(); zoom_ = view.zoom_km(); aspect_ = view.cell_aspect(); heading_ = view.heading();
         blocked_ = std::move(blocked);

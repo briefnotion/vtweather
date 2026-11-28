@@ -47,6 +47,10 @@ Card view_card(const View& view, const Settings& settings, const std::string& ra
 Card help_card();
 Card notes_card(const std::string& notes);       // one line per note (the notes are separated by newlines)
 Card legend_card();                              // the key to the rain
+// The key to the rain when the pen draws it as contour lines (see rain_pen.h): the four bands, each with a sample of its line: in
+// colour a solid line in the band's colour, without colour (white = true) the band's style of line (dotted, dashed, solid, doubled).
+Card pen_legend_card(bool white);
+constexpr int PEN_LEGEND_ROWS = 6;               // its height with the frame: the top right stack keeps clear of that many rows at the bottom
 
 // The driving card: what the GPS says, in miles per hour and feet. With a fix it has the position, the speed (and
 // the heading while the car counts as moving) and the height and satellites; with no fix, or when the data is lost
@@ -58,9 +62,10 @@ Card driving_card(GpsState state, const GpsFix& fix, const std::string& problem,
 
 // Draw the cards that are due: the stack in the top right corner, and the rain card in the bottom
 // right if show_legend is true and the screen is big enough for it, and the driving card (if it has lines) in the
-// bottom left.
+// bottom left. pen_rain says which key to the rain: 0 the letters' (the strip), 1 the pen's lines in colour, 2 the pen's lines
+// without colour.
 void draw_cards(vtscreen::Picture& picture, const View& view, const Settings& settings, const std::string& notes,
                 const std::string& radar_status, bool show_help, bool show_notes, bool show_legend,
-                const Card* driving = nullptr, bool heading_up = false);
+                const Card* driving = nullptr, bool heading_up = false, int pen_rain = 0);
 
 }  // namespace vtw

@@ -341,6 +341,29 @@ times a second, so a map that is moving is not sent faster than that. A letter w
 vtscreen writes again the letters where the old lines were when the lines change, then draws the new ones in one piece. Scrolling the
 terminal with a ReGIS picture on screen is slow in xterm, but this program never scrolls.
 
+## The rain as contour lines
+
+With the pen map on, the rain is drawn like the contour lines of a topographic map instead of as letters (which are hard to read on a
+small monochrome screen). The radar picture is laid on a lattice over the screen (a half column by a quarter row, finer than a cell, so the lines
+are not blocky), and the edge of each band of strength is followed through it (marching squares), rounded, simplified, and drawn with the pen.
+The bands, from light to severe:
+
+| band | from | colour | without colour |
+|------|------|--------|----------------|
+| light | 15 dBZ | green | dotted white line |
+| moderate | 30 dBZ | yellow | dashed white line |
+| heavy | 40 dBZ | orange | solid white line |
+| severe | 50 dBZ | magenta | doubled white line |
+
+The bands are drawn light first and severe last, and the map's own lines (coast, borders, rivers, roads) are drawn after all of them, on top, so
+the borders stay visible and look as if they shine under the radar. In colour the cells under the rain also get a dim tint of the band's colour
+(the fill); with `--no-color` there is **no fill at all**, so nothing hides the map. A small strong core (one radar pixel) is never smoothed away:
+for the moderate, heavy and severe bands the lattice takes the strongest pixel it touches, and a core too small for a line is drawn as a small circle.
+The lines keep out of cells with text, like the map's lines, and the key to the rain (bottom right) shows each band's line. The limits are one table,
+`RAIN_BAND_MIN_DBZ` in `src/rain_contours.h`, and the line styles are in `src/rain_style.cpp`; what counts as a speck is in the same header. The
+contour lines are made again at once when a new radar picture comes in, and otherwise when the view, size or text cells change (at most ten times a second).
+`p` switches back to the letters, which are what a terminal without the pen's lines shows.
+
 ## Where things overlap
 
 Rivers, roads, borders, the coast, the grid and the rain are layers. A cell with one of them holds its
@@ -429,7 +452,7 @@ clock), the fetcher (pacing, backoff, the hourly limit, timeouts, size limit, ca
 PNG reader, the colour scale, the worker thread, the picture cache, what is kept on disk, the keys and the base map (its file format, the
 ring simplifier, filling land and water into cells, and known places on the real file), and the pen map (cutting lines to the screen and around text,
 checked against a plain sampling of random lines and masks; the drawing from made-up shapes and from the real file; which lines at which zoom; how often it is made;
-what the terminal's answers lead to). The GPS reader has tests too (the file's layout, with files made by rasfled2's real writer; damaged, cut-off and odd files; and every state, with a made-up clock and files whose times are set by hand). So do the car (when it counts as moving, holding the position, the arrow and where it is drawn) and the pretend GPS (its drive, the drift, the tunnel, and its file read back by the real reader). The cards have tests too: the frame and its size, wrapping, each corner, stacking, what each card says, the rain card's strip, and when the keys and notes cards come and go. The fetch tests talk to a small server on your own machine; nothing goes to the
+what the terminal's answers lead to), and the rain's contour lines (following a level through a lattice, checked on every cell shape and on random fields; sampling, rounding and dashing; the pen drawing, keep-out cells, tints and the key; and the real Seattle picture). The GPS reader has tests too (the file's layout, with files made by rasfled2's real writer; damaged, cut-off and odd files; and every state, with a made-up clock and files whose times are set by hand). So do the car (when it counts as moving, holding the position, the arrow and where it is drawn) and the pretend GPS (its drive, the drift, the tunnel, and its file read back by the real reader). The cards have tests too: the frame and its size, wrapping, each corner, stacking, what each card says, the rain card's strip, and when the keys and notes cards come and go. The fetch tests talk to a small server on your own machine; nothing goes to the
 internet.
 
 `tests/data/` holds the PNG test pictures, made by `tests/make_png_fixtures.py` (it needs Pillow,
